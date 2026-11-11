@@ -8,7 +8,7 @@ LLM (OpenRouter free) → photorealistic images (Pollinations, free)
 → YouTube upload (YouTube Data API v3) → Google Drive backup
 ```
 
-Cost: **$0/month** (GitHub Actions free tier). Koi video editing nahi — fully automatic. 1 episode/day default (naye channel ke liye safe — 6/day AI mass-content = monetization/reject risk).
+Cost: **$0/month** (GitHub Actions free tier). Koi video editing nahi — fully automatic. 3 episodes/day (10 AM / 4 PM / 11 PM PKT).
 
 > ⚠️ **Yeh (redacted)/(redacted) wale Google account se ALAG hai.** Naye channel ke liye ALAG Google account use hoga, aur `token.json` / `client_secret.json` is folder mein kabhi copy KARNA hi NAHI.
 
@@ -89,7 +89,7 @@ gh variable set TTS_VOICE --body "hi-IN-SwaraNeural"
 3. ~20–60 min baad video Studio mein aayega — watch flow: `work/episode.json` mein generated title/description/narration dikhega (artifact `episode-work` download karke check karein)
 4. Sab theek ho to public run karein
 
-Iske baad roz **11:30 PM PKT** (18:30 UTC) khud hota rahega.
+Iske baad roz 3 times (10 AM / 4 PM / 11 PM PKT) khud hota rahega.
 
 ---
 
@@ -140,7 +140,7 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 | Video length | `vars.TARGET_MINUTES` (22 default, 50 = long-form) ya per-run `target_minutes` input |
 | Image count | `vars.N_IMAGES` (16 default, 20 long mode) |
 | Upload time | `.github/workflows/daily.yml` → cron `30 18 * * *` (UTC) |
-| Frequency | Day mein runs badhane hain to cron line add karein — lekin naye channel pe 1/day hi rakhein |
+| Frequency | `.github/workflows/daily.yml` → cron `0 5,11,18 * * *` (UTC) = 10 AM / 4 PM / 11 PM PKT |
 | Episodes | `episodes.csv` — 30 briefs hain; expert-level topics add karein |
 | Category | `generate_episode.py` → `categoryId: "27"` (Education) — 24 Entertainment bhi kar sakte hain |
 | Images resolution | `W,H` (1024x576), `N_IMAGES` (16) |
@@ -163,4 +163,4 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 - `episodes.csv` — 30 expert-level Universe + Philosophy briefs
 - `state/episodes.json` — next episode tracker
 - `get_token.py` / `get_token_drive.py` — OAuth helpers
-- `.github/workflows/daily.yml` — daily 11:30 PM PKT + manual run
+- `.github/workflows/daily.yml` — 3 episodes/day + manual run

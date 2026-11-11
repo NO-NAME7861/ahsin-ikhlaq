@@ -2,9 +2,8 @@ name: Daily Universe Explorer Upload
 
 on:
   schedule:
-    # 1 episode per day, 11:30 PM PKT = 18:30 UTC
-    # (Naye channel ke liye 1/day safe hai - 6/day mass-AI content = monetization/strike risk)
-    - cron: "30 18 * * *"
+    # 3 episodes per day, 10:00 / 16:00 / 23:00 PKT = 05:00 / 11:00 / 18:00 UTC
+    - cron: "0 5,11,18 * * *"
   workflow_dispatch:
     inputs:
       privacy:
@@ -26,6 +25,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: universe-episode
+  cancel-in-progress: false
 
 jobs:
   generate-and-upload:
@@ -57,7 +60,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free' }}
           TTS_VOICE: ${{ vars.TTS_VOICE || 'hi-IN-SwaraNeural' }}
-          PRIVACY_STATUS: ${{ inputs.privacy || vars.PRIVACY_STATUS || 'private' }}
+          PRIVACY_STATUS: ${{ inputs.privacy || vars.PRIVACY_STATUS || 'public' }}
           EPISODES_CSV: ${{ vars.EPISODES_CSV || 'episodes.csv' }}
           EPISODE_INDEX: ${{ inputs.episode_index || '' }}
           TARGET_MINUTES: ${{ inputs.target_minutes || vars.TARGET_MINUTES || '22' }}
