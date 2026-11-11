@@ -2,8 +2,8 @@ name: Daily Universe Explorer Upload
 
 on:
   schedule:
-    # 3 episodes per day, 10:00 / 16:00 / 23:00 PKT = 05:00 / 11:00 / 18:00 UTC
-    - cron: "0 5,11,18 * * *"
+    # 3 episodes per day, 8:00 / 8:20 / 8:40 PM PKT = 15:00 / 15:20 / 15:40 UTC
+    - cron: "0,20,40 15 * * *"
   workflow_dispatch:
     inputs:
       privacy:
@@ -73,7 +73,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state/episodes.json
-          git diff --cached --quiet || (git commit -m "chore: advance episode state" && git push origin HEAD:main)
+          if git diff --cached --quiet; then
+            echo "state unchanged"
+          else
+            git commit -m "chore: advance episode state"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
 
       - name: Upload work artifacts for debugging
         if: always()
