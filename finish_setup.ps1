@@ -6,48 +6,31 @@ $ErrorActionPreference = 'Stop'
 $Repo = 'NO-NAME7861/universe-explorer'
 $Account = 'ahsininfo [at] gmail.com'
 $ProjectId = 'aue-20261111'
-$Gcloud = Join-Path $env:LOCALAPPDATA 'Temp\opencode\gcloud-portable\google-cloud-sdk\bin\gcloud.cmd'
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ProjectDir
 
-if (-not (Test-Path $Gcloud)) { throw "Portable Google Cloud SDK missing: $Gcloud" }
-$env:PATH = (Split-Path $Gcloud) + ';' + $env:PATH
-
-Write-Host '== 1/5 Checking authorized account =='
-$accounts = @(gcloud auth list --format='value(account)' --quiet 2>&1)
-if (($accounts | ForEach-Object { $_.Trim() }) -notcontains $Account) {
-    throw "Google authorization pending. Authorize $Account first, then rerun this script."
+Write-Host '== 1/4 Finding custom OAuth client secret =='
+if (-not (Test-Path '.\client_secret.json')) {
+    $Downloads = Join-Path $env:USERPROFILE 'Downloads'
+    $candidate = Get-ChildItem -LiteralPath $Downloads -Filter 'client_secret*.json' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $candidate) {
+        throw "client_secret.json missing. Complete OAuth consent screen and Credentials > Create OAuth client ID > Desktop app, then Download JSON."
+    }
+    Copy-Item -LiteralPath $candidate.FullName -Destination '.\client_secret.json'
+    Write-Host "Copied $($candidate.Name)"
 }
-gcloud config set account $Account --quiet | Out-Null
 
-Write-Host '== 2/5 Creating/selecting Google Cloud project =='
-gcloud projects describe $ProjectId --quiet 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw "Google Cloud project $ProjectId missing or inaccessible."
-}
-gcloud config set project $ProjectId --quiet | Out-Null
+Write-Host '== 2/4 Creating channel OAuth token =='
+python get_token.py
+if (-not (Test-Path '.\token.json')) { throw 'token.json not created; browser Allow was not completed.' }
 
-Write-Host '== 3/5 Enabling YouTube Data API and Drive API =='
-gcloud services enable youtube.googleapis.com drive.googleapis.com --project=$ProjectId --quiet
-if ($LASTEXITCODE -ne 0) { throw 'API enable failed' }
+Write-Host '== 3/4 Setting YOUTUBE_TOKEN_JSON secret =='
+$encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path '.\token.json')))
+$encoded | gh secret set YOUTUBE_TOKEN_JSON -R $Repo
 
-Write-Host '== 4/5 Authorizing YouTube/Drive upload credentials =='
-$scopes = @(
-  'openid',
-  'https://www.googleapis.com/auth/userinfo.email',
-  'https://www.googleapis.com/auth/cloud-platform',
-  'https://www.googleapis.com/auth/youtube',
-  'https://www.googleapis.com/auth/youtube.upload',
-  'https://www.googleapis.com/auth/drive.file'
-) -join ','
-gcloud auth application-default login $Account --launch-browser --scopes=$scopes --quiet
-$adc = Join-Path $env:APPDATA 'gcloud\application_default_credentials.json'
-if (-not (Test-Path $adc)) { throw "ADC file missing: $adc" }
-Copy-Item -LiteralPath $adc -Destination (Join-Path $ProjectDir 'token.json') -Force
-[Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path '.\token.json'))) | gh secret set YOUTUBE_TOKEN_JSON -R $Repo
-
-Write-Host '== 5/5 OpenRouter secret and test run =='
-$secure = Read-Host 'Paste OpenRouter API key (input hidden), or press Ctrl+C to stop' -AsSecureString
+Write-Host '== 4/4 OpenRouter secret and private test run =='
+$secure = Read-Host 'OpenRouter API key (input hidden), or Ctrl+C to stop' -AsSecureString
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
 try {
     $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
@@ -64,4 +47,4 @@ if (-not $NoRun) {
     Start-Sleep -Seconds 5
     gh run list -R $Repo --limit 1
 }
-Write-Host "Done. Google Cloud project: $ProjectId | Repository: $Repo"
+Write-Host "Done. Project $ProjectId | Repository $Repo"
