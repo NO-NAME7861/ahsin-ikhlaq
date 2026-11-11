@@ -93,6 +93,23 @@ Iske baad roz **11:30 PM PKT** (18:30 UTC) khud hota rahega.
 
 ---
 
+## 50-minute long-form videos
+
+`TARGET_MINUTES` se video length control hoti hai (default **22**, normal deep-dive). Har video 50-minute banane ke liye:
+
+```powershell
+gh variable set TARGET_MINUTES --body "50"
+```
+
+Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 50** likh do.
+
+**Kaam kaise karta hai**: free models ek response mein 7000+ words nahi de sakte, isliye long mode pehle metadata + 8-scene outline banata hai, phir narration **3 parts (~2400 words each)** mein generate karke stitch karta hai (Devanagari Hindi, same Hinglish style). `N_IMAGES` default 16 → 20 ho jata hai (env se override kar sakte hain). CI timeout 300 min set hai.
+
+**Practical notes**:
+- Render time ~1.5–3 ghante (GitHub Actions pe); file size ~250–400MB — YouTube resumable upload handle karega
+- 50-min videos watch-hours (monetization) fast badhate hain, lekin AI narration pe audience retention kaafi mushkil hota hai — experts bhi 50 mint hold nahi karte. Titles/hooks aur better banao (cf. `make_episodes_100` style hooks) – agar quality gir rahi ho to 22-min default pe wapas a jao: `gh variable set TARGET_MINUTES --body "22"`
+- Cost: poori 50-min pipeline abhi bhi **$0** hai
+
 ## Channels ka separation (IMPORTANT)
 
 | Cheez | (redacted) (purana) | Ahsin Akhlaq (naya) |
@@ -120,6 +137,8 @@ Iske baad roz **11:30 PM PKT** (18:30 UTC) khud hota rahega.
 | Cheez | Kaise |
 |---|---|
 | Voice | `vars.TTS_VOICE`: `hi-IN-SwaraNeural` (Hindi female), `hi-IN-MadhurNeural` (Hindi male), `ur-PK-UzmaNeural` (Urdu), `en-IN-NeerjaNeural` (Indian English) |
+| Video length | `vars.TARGET_MINUTES` (22 default, 50 = long-form) ya per-run `target_minutes` input |
+| Image count | `vars.N_IMAGES` (16 default, 20 long mode) |
 | Upload time | `.github/workflows/daily.yml` → cron `30 18 * * *` (UTC) |
 | Frequency | Day mein runs badhane hain to cron line add karein — lekin naye channel pe 1/day hi rakhein |
 | Episodes | `episodes.csv` — 30 briefs hain; expert-level topics add karein |

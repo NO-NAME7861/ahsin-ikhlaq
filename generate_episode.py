@@ -39,8 +39,12 @@ UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
 DRY_RUN            = os.environ.get("DRY_RUN", "0") == "1"
 EPISODE_OVERRIDE   = os.environ.get("EPISODE_INDEX", "").strip()  # force a specific episode id
 
+TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "22"))   # 22 = normal deep-dive, 50 = long-form
+WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 145)))
+LONG_MODE          = TARGET_MINUTES >= 40
 W, H, FPS = 1024, 576, 25
-N_IMAGES = 16  # Pollinations free; spaced to stay inside free-tier rate limits
+_n_img_env = os.environ.get("N_IMAGES", "").strip()
+N_IMAGES           = int(_n_img_env) if _n_img_env else (20 if LONG_MODE else 16)
 CHANNEL_NAME = "Ahsin Akhlaq"
 
 # ---------------------------------------------------------------- helpers
@@ -73,13 +77,13 @@ def mark_done(ep_id):
 
 # ---------------------------------------------------------------- 1. script
 
-def _call_llm_once(model, row, sys_prompt, user_prompt):
+def _call_llm_once(model, row, sys_prompt, user_prompt, max_tokens=7500, expect_json=True):
     payload = json.dumps({
         "model": model,
         "messages": [{"role": "system", "content": sys_prompt},
                      {"role": "user", "content": user_prompt}],
         "temperature": 0.8,
-        "max_tokens": 7500,
+        "max_tokens": max_tokens,
         "reasoning": {"enabled": False},
     }).encode()
 
@@ -104,14 +108,14 @@ def _call_llm_once(model, row, sys_prompt, user_prompt):
         raise RuntimeError("empty content: " + json.dumps(resp)[:1500])
 
     content = content.strip()
+    if not expect_json:
+        return content
     start, end = content.find("{"), content.rfind("}")
     if start == -1 or end == -1:
         raise RuntimeError("no JSON in reply: " + content[:1500])
     return json.loads(content[start:end + 1])
 
 def call_llm(row):
-    style_req = "photorealistic, cinematic documentary stills, NASA/ESA-grade space visualization aesthetic"
-    thumbnail_desc = "photorealistic, cinematic, ultra-detailed space documentary style"
     sys_prompt = (
         f"You are a world-class science communicator and philosopher writing for the YouTube channel '{CHANNEL_NAME}', "
         "a deep-dive channel that merges cutting-edge universe exploration and space science with profound philosophy. "
@@ -123,14 +127,15 @@ def call_llm(row):
         "numbers and dates. If a fact is uncertain or debated, say so honestly. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
+    n_img_prompts = N_IMAGES
     user_prompt = f"""Write one complete deep-dive episode in this exact JSON shape:
 {{
  "title": "YouTube title, max 70 chars, expert curiosity-gap Hinglish (Devanagari Hindi + English terms), e.g. 'ब्लैक होल के अंदर क्या होता है? Information Paradox Explained'",
  "description": "2-3 sentence hook + 1 line central insight + line: 'Yeh video AI-generated visuals aur AI narration se banayi gayi hai. Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars",
  "tags": ["max 15 tags, mix Hindi and English"],
  "moral": "one sentence — the episode's central philosophical insight",
- "narration": "3200-3800 words continuous narration in expert-level Hinglish. WRITTEN IN DEVANAGARI HINDI with English technical terms in Latin script (जैसे: 'black hole', 'redshift', 'entropy'). Natural spoken rhythm: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Avoid Sanskritized heavy Hindi — speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
- "image_prompts": ["16 SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
+ "narration": "{WORDS_TARGET} words (±10%) continuous narration in expert-level Hinglish. WRITTEN IN DEVANAGARI HINDI with English technical terms in Latin script (जैसे: 'black hole', 'redshift', 'entropy'). Natural spoken rhythm: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Avoid Sanskritized heavy Hindi — speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
+ "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark"
 }}
 
@@ -138,19 +143,75 @@ Episode brief (topic + central insight):
 Topic seed: {row['topic']}
 Central insight: {row['moral']}"""
 
+    if LONG_MODE:
+        ep = call_llm_long(row, sys_prompt, user_prompt)
+        log("LLM OK via long-form mode (3 narrations stitched)")
+        return ep
+
+    return _llm_with_fallback(sys_prompt, user_prompt, 8000, "episode")
+
+# ---- long-form (50-minute) mode -------------------------------------------
+
+def _llm_with_fallback(sys_prompt, user_prompt, max_tokens, label, expect_json=True):
     models = [OPENROUTER_MODEL] + [m for m in FALLBACK_MODELS if m != OPENROUTER_MODEL]
     failures = []
     for model in models:
         for attempt in range(3):
             try:
-                ep = _call_llm_once(model, row, sys_prompt, user_prompt)
-                log(f"LLM OK via {model} (attempt {attempt + 1})")
+                ep = _call_llm_once(model, None, sys_prompt, user_prompt, max_tokens, expect_json)
+                log(f"LLM OK via {model} ({label}, attempt {attempt + 1})")
                 return ep
             except Exception as e:
-                log(f"model {model} attempt {attempt + 1} failed: {e}")
+                log(f"model {model} {label} attempt {attempt + 1} failed: {e}")
                 failures.append(f"{model}: {e}")
                 time.sleep(20)
-    sys.exit("All LLM models failed:\n" + "\n\n".join(failures))
+    sys.exit(f"All LLM models failed ({label}):\n" + "\n\n".join(failures))
+
+def call_llm_long(row, sys_prompt, _unused):
+    """50-minute episodes: meta + 3 narration parts stitched (free models cap output)."""
+    meta_prompt = f"""Write ONLY the metadata for one long-form (50-minute) deep-dive episode. Reply with valid JSON:
+{{
+ "title": "YouTube title, max 70 chars, expert curiosity-gap Hinglish",
+ "description": "2-3 sentence hook + 1 line central insight + line: 'Yeh video AI-generated visuals aur AI narration se banayi gayi hai. Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars",
+ "tags": ["max 15 tags, mix Hindi and English"],
+ "moral": "one sentence — the episode's central philosophical insight",
+ "image_prompts": ["{N_IMAGES} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>. Space imagery throughout."],
+ "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
+ "outline": ["8 scene summaries with the key scientific facts, numbers and philosophers to cover, in order — this is the plan for the 3 narrative parts"]
+}}
+
+Topic seed: {row['topic']}
+Central insight: {row['moral']}"""
+    meta = _llm_with_fallback(sys_prompt, meta_prompt, 4500, "meta")
+    outline = meta.get("outline", [])
+    outline_txt = "\n".join(f"Scene {i+1}: {o}" for i, o in enumerate(outline))
+
+    parts = []
+    for part_no in (1, 2, 3):
+        part_prompt = f"""You are writing PART {part_no} of 3 narration parts for ONE 50-minute deep-dive episode
+(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (±10%), expert-level Hinglish, Devanagari Hindi with English technical terms in Latin script, natural spoken rhythm, paragraph breaks every few sentences).
+
+Episode topic: {row['topic']}
+Central insight: {row['moral']}
+
+FULL OUTLINE (do NOT repeat what other parts cover — write ONLY your assigned scenes):
+{outline_txt}
+
+PART {part_no} ASSIGNMENT:
+{'Open the episode with a powerful hook. Cover outline scenes 1-3. End part 1 on a cliffhanger.' if part_no == 1 else ('Continue from part 1. Cover outline scenes 4-6. Keep tension rising. End part 2 mid-crescendo.' if part_no == 2 else 'Now land the plane. Cover the remaining outline scenes. End with the central philosophical insight, delivered with awe.')}
+
+Reply with plain text ONLY (no JSON, no markdown) — just the narration in Devanagari Hindi with English terms in Latin script, ready for voiceover."""
+        part = _llm_with_fallback(sys_prompt, part_prompt, 6000, f"narration-part-{part_no}", expect_json=False)
+        parts.append(part.strip())
+
+    ep = dict(meta)
+    ep.pop("outline", None)
+    ep["narration"] = "\n\n".join(p.strip() for p in parts)
+    wc = len(ep["narration"].split())
+    log(f"long-form narration assembled: {wc} words")
+    if wc < WORDS_TARGET * 0.6:
+        log("WARNING: narration shorter than expected — video may be shorter than target")
+    return ep
 
 # ---------------------------------------------------------------- 2. images
 
