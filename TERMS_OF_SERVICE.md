@@ -2,7 +2,7 @@
 
 **Last updated: November 2026**
 
-These terms govern the use of the automation software for the owner of the **Ahsin Akhlaq** YouTube channel (Universe & Philosophy deep dives).
+These terms govern the use of the automation software for the owner of the **Ahsin Akhlaq** YouTube channel — https://www.youtube.com/@ahsin-ikhlaq (Universe & Philosophy deep dives).
 
 ## 1. What this software is
 The application ("UniverseExplorer") is a personal, automated tool used by the channel owner to generate and upload videos to the owner's own channel. It is not a public service; it is not sold or offered to other users.

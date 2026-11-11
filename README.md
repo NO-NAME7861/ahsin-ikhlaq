@@ -20,7 +20,7 @@ Cost: **$0/month** (GitHub Actions free tier). Koi video editing nahi — fully 
 
 1. Naya Gmail account (ya jo account naye channel ke liye dedicated hai) — sign in rakhein
 2. [youtube.com](https://www.youtube.com) → profile icon → **Create a channel** → naam: **Ahsin Akhlaq**
-3. Handle apni marzi se set karein (e.g. `@AhsinAkhlaqUniverse` / `@UniverseWithAhsin` — jo available ho). *Handle maine abhi placeholder `AhsinAkhlaq` rakha hai — jab handle confirm ho jaye to README/DESCRIPTION update kar dena.*
+3. Channel ban gaya hai ✅ — **https://www.youtube.com/@ahsin-ikhlaq** (naam: Ahsin-Akhlaq).
 
 ### STEP 1 — Google Cloud project (NAYE account par)
 
@@ -65,7 +65,7 @@ Browser khulega → **naya** Google account select → Allow → `token.json` ba
 
 ### STEP 6 — GitHub repo + secrets
 
-Naya **Private** repo banayein, e.g. `AhsinAkhlaq/universe-explorer` (ya `NO-NAME7861/universe-explorer` agar wahi GitHub account hai).
+Repo already banaya jaa chuka hai: **NO-NAME7861/universe-explorer** (private) — wahi GitHub account jaisa purana project.
 
 ```powershell
 cd "C:\Users\Park-Edge\Documents\Default Project\universe-explorer"

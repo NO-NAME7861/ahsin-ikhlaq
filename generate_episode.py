@@ -89,7 +89,7 @@ def _call_llm_once(model, row, sys_prompt, user_prompt):
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/AhsinAkhlaq/universe-explorer",
+            "HTTP-Referer": "https://github.com/NO-NAME7861/universe-explorer",
             "X-Title": "Universe Explorer Automation",
         })
     with urllib.request.urlopen(req, timeout=240) as r:

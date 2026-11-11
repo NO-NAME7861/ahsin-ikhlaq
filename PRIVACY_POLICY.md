@@ -2,7 +2,7 @@
 
 **Last updated: November 2026**
 
-This policy covers the "UniverseExplorer" application (a personal, unverified automation tool) operated by the owner of the YouTube channel associated with **Ahsin Akhlaq** (handle to be confirmed).
+This policy covers the "UniverseExplorer" application (a personal, unverified automation tool) operated by the owner of the YouTube channel https://www.youtube.com/@ahsin-ikhlaq.
 
 ## What this app does
 The app uploads videos to the operator's own YouTube channel and, optionally, backs them up to the operator's Google Drive. It uses Google APIs as an uploader of the operator's own content.
