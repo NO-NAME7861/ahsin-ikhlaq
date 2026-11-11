@@ -45,7 +45,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-core fonts-noto-ui-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-core fonts-noto-ui-core fonts-noto-nastaliq-urdu
 
       - name: Install Python deps
         run: pip install -r requirements.txt
@@ -59,7 +59,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free' }}
-          TTS_VOICE: ${{ vars.TTS_VOICE || 'hi-IN-SwaraNeural' }}
+          TTS_VOICE: ${{ vars.TTS_VOICE || 'ur-PK-UzmaNeural' }}
           PRIVACY_STATUS: ${{ inputs.privacy || vars.PRIVACY_STATUS || 'public' }}
           EPISODES_CSV: ${{ vars.EPISODES_CSV || 'episodes.csv' }}
           EPISODE_INDEX: ${{ inputs.episode_index || '' }}

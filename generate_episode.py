@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Ahsin Akhlaq — Universe & Philosophy Automation
-Pipeline: LLM script (expert-level cosmology + philosophy, Devanagari Hindi + English terms)
-          -> photorealistic images -> edge-tts hi-IN voice
+Pipeline: LLM script (expert-level cosmology + philosophy, Urdu + English terms)
+          -> photorealistic images -> edge-tts ur-PK voice
           -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
 Run locally (test):  DRY_RUN=1 python generate_episode.py
 Run in CI:           private run first, then set UPLOAD=1
 """
 import os, sys, json, csv, time, random, base64, asyncio, subprocess
+import re
 import urllib.request, urllib.parse
 from pathlib import Path
 from datetime import datetime
@@ -32,7 +33,7 @@ FALLBACK_MODELS    = [m for m in [
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3.5-lightning:free",
 ] ]
-VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")   # Devanagari Hindi voice
+VOICE              = os.environ.get("TTS_VOICE", "ur-PK-UzmaNeural")   # Urdu female voice
 TTS_RATE           = os.environ.get("TTS_RATE", "-5%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")  # safe default; set public when confident
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
@@ -51,6 +52,20 @@ CHANNEL_NAME = "Ahsin Akhlaq"
 
 def log(*a):
     print(f"[{datetime.now():%H:%M:%S}]", *a, flush=True)
+
+AI_PHRASES = [
+    r"AI[-]?generated", r"AI generated", r"AI[-]?narration", r"AI narration",
+    r"AI[-]?content", r"AI content", r"artificial intelligence", r"synthetic content", r"\bAI\b",
+]
+
+def scrub_ai_text(text):
+    if not text:
+        return text
+    out = text
+    for pattern in AI_PHRASES:
+        out = re.sub(pattern, "", out, flags=re.IGNORECASE)
+    out = re.sub(r"\s{2,}", " ", out).strip(" -—:,.;")
+    return out or text
 
 def load_episode():
     rows = list(csv.DictReader(open(EPISODES_CSV, encoding="utf-8")))
@@ -120,21 +135,22 @@ def call_llm(row):
         f"You are a world-class science communicator and philosopher writing for the YouTube channel '{CHANNEL_NAME}', "
         "a deep-dive channel that merges cutting-edge universe exploration and space science with profound philosophy. "
         "You combine the rigor of a cosmology textbook, the storytelling of Carl Sagan, and the depth of a philosophy "
-        "seminar. You write for a Hindi/Urdu-speaking Indian & Pakistani audience in expert-level Hinglish: the narration "
-        "is written in Devanagari Hindi script with English technical terms left in Latin script (e.g., 'black hole', "
-        "'entropy', 'dark matter', 'fine-tuning'). You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
+        "seminar. You write for a Pakistani and Urdu-speaking audience in expert-level Urdu: the narration is written "
+        "in Urdu script (Nastaliq) with English technical terms left in Latin script (e.g., 'black hole', 'entropy', "
+        "'dark matter', 'fine-tuning'). You NEVER use Devanagari/Hindi. You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
         "Event Horizon Telescope, New Horizons), real scientists (Einstein, Sagan, Hawking, Noether), real theories, real "
         "numbers and dates. If a fact is uncertain or debated, say so honestly. "
+        "Never use phrases like 'AI-generated', 'AI content', 'AI narration', or 'artificial intelligence' in the title or description. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
     n_img_prompts = N_IMAGES
     user_prompt = f"""Write one complete deep-dive episode in this exact JSON shape:
 {{
- "title": "YouTube title, max 70 chars, expert curiosity-gap Hinglish (Devanagari Hindi + English terms), e.g. 'ब्लैक होल के अंदर क्या होता है? Information Paradox Explained'",
- "description": "2-3 sentence hook + 1 line central insight + line: 'Yeh video AI-generated visuals aur AI narration se banayi gayi hai. Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars",
- "tags": ["max 15 tags, mix Hindi and English"],
+ "title": "YouTube title, max 70 chars, expert curiosity-gap Urdu or English (Urdu script or English), e.g. 'Black Hole ke andar kya hota hai? The Great Silence Explained'",
+ "description": "2-3 sentence hook + 1 line central insight + line: 'Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
+ "tags": ["max 15 tags, mix Urdu and English"],
  "moral": "one sentence — the episode's central philosophical insight",
- "narration": "{WORDS_TARGET} words (±10%) continuous narration in expert-level Hinglish. WRITTEN IN DEVANAGARI HINDI with English technical terms in Latin script (जैसे: 'black hole', 'redshift', 'entropy'). Natural spoken rhythm: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Avoid Sanskritized heavy Hindi — speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
+ "narration": "{WORDS_TARGET} words (±10%) continuous narration in expert-level Urdu with English technical terms in Latin script. WRITTEN IN URDU SCRIPT (Nastaliq) with English technical terms in Latin script (such as: 'black hole', 'redshift', 'entropy'). Natural spoken rhythm: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark"
 }}
@@ -171,9 +187,9 @@ def call_llm_long(row, sys_prompt, _unused):
     """50-minute episodes: meta + 3 narration parts stitched (free models cap output)."""
     meta_prompt = f"""Write ONLY the metadata for one long-form (50-minute) deep-dive episode. Reply with valid JSON:
 {{
- "title": "YouTube title, max 70 chars, expert curiosity-gap Hinglish",
- "description": "2-3 sentence hook + 1 line central insight + line: 'Yeh video AI-generated visuals aur AI narration se banayi gayi hai. Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars",
- "tags": ["max 15 tags, mix Hindi and English"],
+ "title": "YouTube title, max 70 chars, expert curiosity-gap Urdu or English",
+ "description": "2-3 sentence hook + 1 line central insight + line: 'Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
+ "tags": ["max 15 tags, mix Urdu and English"],
  "moral": "one sentence — the episode's central philosophical insight",
  "image_prompts": ["{N_IMAGES} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>. Space imagery throughout."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
@@ -189,7 +205,7 @@ Central insight: {row['moral']}"""
     parts = []
     for part_no in (1, 2, 3):
         part_prompt = f"""You are writing PART {part_no} of 3 narration parts for ONE 50-minute deep-dive episode
-(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (±10%), expert-level Hinglish, Devanagari Hindi with English technical terms in Latin script, natural spoken rhythm, paragraph breaks every few sentences).
+(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (±10%), expert-level Urdu with English technical terms in Latin script, natural spoken rhythm, paragraph breaks every few sentences).
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
@@ -200,7 +216,7 @@ FULL OUTLINE (do NOT repeat what other parts cover — write ONLY your assigned 
 PART {part_no} ASSIGNMENT:
 {'Open the episode with a powerful hook. Cover outline scenes 1-3. End part 1 on a cliffhanger.' if part_no == 1 else ('Continue from part 1. Cover outline scenes 4-6. Keep tension rising. End part 2 mid-crescendo.' if part_no == 2 else 'Now land the plane. Cover the remaining outline scenes. End with the central philosophical insight, delivered with awe.')}
 
-Reply with plain text ONLY (no JSON, no markdown) — just the narration in Devanagari Hindi with English terms in Latin script, ready for voiceover."""
+Reply with plain text ONLY (no JSON, no markdown) - just the narration in Urdu script with English terms in Latin script, ready for voiceover."""
         part = _llm_with_fallback(sys_prompt, part_prompt, 6000, f"narration-part-{part_no}", expect_json=False)
         parts.append(part.strip())
 
@@ -303,13 +319,13 @@ def mix_narration_with_bgm(audio):
     subprocess.run([
         "ffmpeg", "-y", "-stream_loop", "-1", "-i", str(bgm), "-i", str(audio),
         "-filter_complex",
-        f"[1:a]volume=1.0[n];[0:a]volume=0.13,"
+        f"[1:a]volume=1.0[n];[0:a]volume=0.16,"
         f"afade=t=in:st=0:d=6,afade=t=out:st={fade_end:.2f}:d=6[m];"
         f"[n][m]amix=inputs=2:duration=first:dropout_transition=2,"
         f"loudnorm[a]",
         "-map", "[a]", "-c:a", "libmp3lame", "-q:a", "3", str(mixed)],
         check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    log("BGM mixed with narration (volume 0.13 + loudnorm)")
+    log("BGM mixed with narration (volume 0.16 + loudnorm)")
     return mixed
 
 def build_video(image_paths, audio, srt, out_mp4, thumb):
@@ -330,7 +346,7 @@ def build_video(image_paths, audio, srt, out_mp4, thumb):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Sans Devanagari,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
+    sub_style = ("FontName=Noto Nastaliq Urdu,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
                  "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=22")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
@@ -431,7 +447,7 @@ def playlist_for():
             if item["snippet"]["title"] == title:
                 return item["id"]
         desc = ("Universe exploration aur philosophy ke expert-level deep dives. "
-                "AI-generated visuals aur AI narration. Har episode mein ek gehra philosophical sawal.")
+                "Har episode mein ek gehra philosophical sawal.")
         p = yt.playlists().insert(part="snippet,status",
             body={"snippet": {"title": title, "description": desc, "defaultLanguage": "hi"},
                   "status": {"privacyStatus": "public"}}).execute()
@@ -474,6 +490,8 @@ def main():
     log(f"episode: {row['id']} | {row['topic']}")
 
     ep = call_llm(row)
+    ep["title"] = scrub_ai_text(ep.get("title", ""))
+    ep["description"] = scrub_ai_text(ep.get("description", ""))
     log("LLM wrote:", ep["title"])
     (WORK / "episode.json").write_text(json.dumps(ep, indent=2, ensure_ascii=False))
 
