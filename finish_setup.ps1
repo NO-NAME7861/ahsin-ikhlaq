@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Repo = 'NO-NAME7861/universe-explorer'
 $Account = 'ahsininfo [at] gmail.com'
-$ProjectId = 'ahsin-universe-explorer-rh'
+$ProjectId = 'aue-20261111'
 $Gcloud = Join-Path $env:LOCALAPPDATA 'Temp\opencode\gcloud-portable\google-cloud-sdk\bin\gcloud.cmd'
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ProjectDir
@@ -23,7 +23,7 @@ gcloud config set account $Account --quiet | Out-Null
 Write-Host '== 2/5 Creating/selecting Google Cloud project =='
 gcloud projects describe $ProjectId --quiet 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    gcloud projects create $ProjectId --name='Universe Explorer' --quiet
+    throw "Google Cloud project $ProjectId missing or inaccessible."
 }
 gcloud config set project $ProjectId --quiet | Out-Null
 
