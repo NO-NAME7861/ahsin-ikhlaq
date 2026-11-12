@@ -54,9 +54,12 @@ def call_llm(prompt, max_tokens=1800):
     sys.exit("all models failed")
 
 def commit_file(filename):
+    subprocess.run(["git", "config", "user.name", "github-actions[bot]"], cwd=str(ROOT), check=False)
+    subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], cwd=str(ROOT), check=False)
     subprocess.run(["git", "add", str(filename)], cwd=str(ROOT), check=False)
-    subprocess.run(["git", "commit", "-m", f"chore: add quizzes {filename.name}"], cwd=str(ROOT),
-                   capture_output=True)
+    cr = subprocess.run(["git", "commit", "-m", f"chore: add quizzes {filename.name}"], cwd=str(ROOT),
+                        capture_output=True)
+    print("commit exit:", cr.returncode, cr.stdout.decode()[-300:], cr.stderr.decode()[-300:])
     pp = subprocess.run(["git", "push", "origin", "main"], cwd=str(ROOT),
                         capture_output=True)
     print("push exit:", pp.returncode)
