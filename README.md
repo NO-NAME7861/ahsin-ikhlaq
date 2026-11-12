@@ -1,14 +1,14 @@
 # Ahsin Akhlaq — Universe & Philosophy YouTube Automation
 
-Naya channel: **Universe Explorer + Philosophy** — expert-level Hinglish deep-dives (Devanagari Hindi with English technical terms).
+Naya channel: **Universe Explorer + Philosophy** — expert-level Urdu + English deep-dives (Urdu script narration with English technical terms).
 
 ```
 LLM (OpenRouter free) → photorealistic images (Pollinations, free)
-→ edge-tts hi-IN-SwaraNeural voice (free) → subtitles + Ken Burns video (ffmpeg)
+→ edge-tts ur-PK-UzmaNeural voice (free) → subtitles + Ken Burns video (ffmpeg)
 → YouTube upload (YouTube Data API v3) → Google Drive backup
 ```
 
-Cost: **$0/month** (GitHub Actions free tier). Koi video editing nahi — fully automatic. 3 episodes/day (10 AM / 4 PM / 11 PM PKT).
+Cost: **$0/month** (GitHub Actions free tier). Koi video editing nahi — fully automatic. 3 videos/day + 3 Shorts/day (all within YouTube's 10,000 unit/day API quota; ~6 uploads × 1,600 = 9,600).
 
 > ⚠️ **Yeh (redacted)/(redacted) wale Google account se ALAG hai.** Naye channel ke liye ALAG Google account use hoga, aur `token.json` / `client_secret.json` is folder mein kabhi copy KARNA hi NAHI.
 
