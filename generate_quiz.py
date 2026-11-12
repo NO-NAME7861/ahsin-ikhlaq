@@ -6,6 +6,7 @@ Creates 2 quiz prompts per day; saves to quizzes/quiz-<date>.md and commits+push
 You paste the two questions manually into Studio Community → Poll/Post.
 """
 import os, sys, json, re, time, subprocess, random
+import ast
 import urllib.request
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -102,10 +103,30 @@ Rules:
 Topic date: {tag}."""
 
     raw = call_llm(prompt, max_tokens=1600)
-    m = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not m:
-        sys.exit("no JSON in reply")
-    data = json.loads(m.group(0))
+    block = None
+    for attempt in range(3):
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            block = m.group(0)
+            break
+        if attempt < 2:
+            print("no JSON block found; retrying with stricter prompt")
+            raw = call_llm(prompt + "\n\nReply ONLY with a single JSON object. No prose, no markdown.", max_tokens=1600)
+    if not block:
+        sys.exit("no JSON in reply after retries")
+
+    data = None
+    try:
+        data = json.loads(block)
+    except Exception:
+        try:
+            block2 = re.sub(r"(?<!\\)'", '"', block)
+            data = json.loads(block2)
+        except Exception:
+            try:
+                data = ast.literal_eval(block)
+            except Exception as e:
+                sys.exit(f"JSON parse failed: {e}\nReply was:\n{raw[:1500]}")
     quizzes = data.get("quizzes", [])
     assert len(quizzes) == 2, "expected 2 quizzes"
 
