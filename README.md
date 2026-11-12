@@ -136,9 +136,10 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 
 | Cheez | Kaise |
 |---|---|
-| Voice | `vars.TTS_VOICE`: `hi-IN-SwaraNeural` (Hindi female), `hi-IN-MadhurNeural` (Hindi male), `ur-PK-UzmaNeural` (Urdu), `en-IN-NeerjaNeural` (Indian English) |
-| Video length | `vars.TARGET_MINUTES` (22 default, 50 = long-form) ya per-run `target_minutes` input |
-| Image count | `vars.N_IMAGES` (16 default, 20 long mode) |
+| Voice | `vars.TTS_VOICE`: `ur-PK-UzmaNeural` (Urdu female), `hi-IN-MadhurNeural`, `en-IN-NeerjaNeural` |
+| Video length | `vars.TARGET_MINUTES` (22 default, >=15 uses chunked 3-part LLM generation) |
+| Shorts | automatic 3/day (9 AM / 1 PM / 6 PM PKT) via `.github/workflows/shorts.yml` |
+| Quizzes | automatic daily generation; file in `quizzes/` — copy into Studio → Community → Poll (manual) |
 | Upload time | `.github/workflows/daily.yml` → cron `30 18 * * *` (UTC) |
 | Frequency | `.github/workflows/daily.yml` → cron `0 5,11,18 * * *` (UTC) = 10 AM / 4 PM / 11 PM PKT |
 | Episodes | `episodes.csv` — 30 briefs hain; expert-level topics add karein |
@@ -159,8 +160,13 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 
 ## Files
 
-- `generate_episode.py` — main pipeline (expert Hinglish script, photorealistic images, hi-IN voice)
+- `generate_episode.py` — main pipeline (long-form Hinglish/Urdu script, photorealistic images, ur-PK voice)
+- `generate_short.py` — vertical Shorts pipeline (1080x1920)
+- `update_state.py` — atomic episode state persistence (fetch-recompute-retry)
+- `generate_quiz.py` — 2 daily cosmos/philosophy quizzes, writes `quizzes/quiz-YYYY-MM-DD.md`
 - `episodes.csv` — 30 expert-level Universe + Philosophy briefs
-- `state/episodes.json` — next episode tracker
+- `state/episodes.json` / `state/shorts.json` — episode/shorts trackers
 - `get_token.py` / `get_token_drive.py` — OAuth helpers
-- `.github/workflows/daily.yml` — 3 episodes/day + manual run
+- `.github/workflows/daily.yml` — 3 episodes/day
+- `.github/workflows/shorts.yml` — 3 Shorts/day
+- `.github/workflows/quiz.yml` — daily quiz batch
