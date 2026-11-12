@@ -146,9 +146,9 @@ def call_llm(row):
     n_img_prompts = N_IMAGES
     user_prompt = f"""Write one complete deep-dive episode in this exact JSON shape:
 {{
- "title": "YouTube title, max 70 chars, expert curiosity-gap Urdu or English (Urdu script or English), e.g. 'Black Hole ke andar kya hota hai? The Great Silence Explained'",
- "description": "2-3 sentence hook + 1 line central insight + line: 'Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
- "tags": ["max 15 tags, mix Urdu and English"],
+ "title": "YouTube title, max 70 chars, expert curiosity-gap ENGLISH ONLY, e.g. 'What Happens Inside a Black Hole? The Information Paradox Explained'",
+ "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
+ "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence — the episode's central philosophical insight",
  "narration": "{WORDS_TARGET} words (±10%) continuous narration in expert-level Urdu with English technical terms in Latin script. WRITTEN IN URDU SCRIPT (Nastaliq) with English technical terms in Latin script (such as: 'black hole', 'redshift', 'entropy'). Natural spoken rhythm: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
@@ -187,9 +187,9 @@ def call_llm_long(row, sys_prompt, _unused):
     """50-minute episodes: meta + 3 narration parts stitched (free models cap output)."""
     meta_prompt = f"""Write ONLY the metadata for one long-form (50-minute) deep-dive episode. Reply with valid JSON:
 {{
- "title": "YouTube title, max 70 chars, expert curiosity-gap Urdu or English",
- "description": "2-3 sentence hook + 1 line central insight + line: 'Facts ke sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
- "tags": ["max 15 tags, mix Urdu and English"],
+ "title": "YouTube title, max 70 chars, expert curiosity-gap ENGLISH ONLY",
+ "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
+ "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence — the episode's central philosophical insight",
  "image_prompts": ["{N_IMAGES} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>. Space imagery throughout."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
@@ -446,8 +446,8 @@ def playlist_for():
         for item in resp.get("items", []):
             if item["snippet"]["title"] == title:
                 return item["id"]
-        desc = ("Universe exploration aur philosophy ke expert-level deep dives. "
-                "Har episode mein ek gehra philosophical sawal.")
+        desc = ("Universe exploration and philosophy deep dives. "
+                "Every episode explores one profound question about the cosmos and the human condition.")
         p = yt.playlists().insert(part="snippet,status",
             body={"snippet": {"title": title, "description": desc, "defaultLanguage": "hi"},
                   "status": {"privacyStatus": "public"}}).execute()
