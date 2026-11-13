@@ -40,7 +40,7 @@ UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
 DRY_RUN            = os.environ.get("DRY_RUN", "0") == "1"
 EPISODE_OVERRIDE   = os.environ.get("EPISODE_INDEX", "").strip()  # force a specific episode id
 
-TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "22"))   # minutes; >=15 uses 3-part chunked generation (free LLM output caps ~4k tokens)
+TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "12"))   # minutes; <=14 keeps videos under the 15-minute upload limit for unverified channels. Raise via vars after phone verification (youtube.com/verify).
 WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 145)))
 LONG_MODE          = TARGET_MINUTES >= 15
 W, H, FPS = 1024, 576, 25
