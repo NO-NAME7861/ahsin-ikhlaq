@@ -95,10 +95,11 @@ Iske baad roz 3 times (10 AM / 4 PM / 11 PM PKT) khud hota rahega.
 
 ## 50-minute long-form videos
 
-`TARGET_MINUTES` se video length control hoti hai (default **22**, normal deep-dive). Har video 50-minute banane ke liye:
+`TARGET_MINUTES` se video length control hoti hai. **Abhi default 12** (unverified channel ke liye safe limit — YouTube 15+ minute accept nahi karta).
 
+⚠️ **Jab tak channel phone verification nahi ho ([youtube.com/verify](https://www.youtube.com/verify)) — YouTube >15 min unverified channels ke videos ko REJECT karta hai**, videos "Deleted" dikhti hain. Verification hone ke baad:
 ```powershell
-gh variable set TARGET_MINUTES --body "50"
+gh variable set TARGET_MINUTES --body "22"
 ```
 
 Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 50** likh do.
