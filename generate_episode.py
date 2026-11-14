@@ -319,7 +319,7 @@ def mix_narration_with_bgm(audio):
     subprocess.run([
         "ffmpeg", "-y", "-stream_loop", "-1", "-i", str(bgm), "-i", str(audio),
         "-filter_complex",
-        f"[1:a]volume=1.0[n];[0:a]volume=0.16,"
+        f"[1:a]volume=1.0[n];[0:a]volume=0.08,"
         f"afade=t=in:st=0:d=6,afade=t=out:st={fade_end:.2f}:d=6[m];"
         f"[n][m]amix=inputs=2:duration=first:dropout_transition=2,"
         f"loudnorm[a]",
