@@ -41,7 +41,9 @@ DRY_RUN            = os.environ.get("DRY_RUN", "0") == "1"
 EPISODE_OVERRIDE   = os.environ.get("EPISODE_INDEX", "").strip()  # force a specific episode id
 
 TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "12"))   # minutes; <=14 keeps videos under the 15-minute upload limit for unverified channels. Raise via vars after phone verification (youtube.com/verify).
-WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 145)))
+# Hindi TTS speaks ~0.55 s/word at rate=-5% -> ~109 words/minute. Use ~110 words/min so the final video
+# matches TARGET_MINUTES even with LLM overshoot (an unverified channel cannot upload videos >15:00).
+WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 110)))
 LONG_MODE          = TARGET_MINUTES >= 15
 W, H, FPS = 1024, 576, 25
 _n_img_env = os.environ.get("N_IMAGES", "").strip()
@@ -640,6 +642,11 @@ def main():
 
     mp3, srt = WORK / "narration.mp3", WORK / "narration.srt"
     run_tts(WORK / "narration.txt", mp3, srt)
+    dur = media_duration(mp3)
+    log(f"narration audio duration: {dur:.1f}s ({dur / 60:.1f} min)")
+    if dur > 850:  # 14m10s — leaves margin under the 15:00 limit for unverified channels
+        sys.exit(f"narration too long for an unverified channel ({dur / 60:.1f} min). "
+                 "Aborting before upload. Lower TARGET_MINUTES/WORDS_TARGET or verify the channel (youtube.com/verify).")
 
     thumb = WORK / "thumb.png"
     thumb_q = ep.get("thumbnail_query") or (queries[0] if queries else "galaxy cosmos")
