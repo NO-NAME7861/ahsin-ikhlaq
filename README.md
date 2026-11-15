@@ -1,10 +1,10 @@
 # Ahsin Akhlaq — Universe & Philosophy YouTube Automation
 
-Naya channel: **Universe Explorer + Philosophy** — expert-level Urdu + English deep-dives (Urdu script narration with English technical terms).
+Naya channel: **Universe Explorer + Philosophy** — simple spoken Hindi (Devanagari) + English deep-dives (clear Hindi narration with English technical terms).
 
 ```
 LLM (OpenRouter free) → photorealistic images (Pollinations, free)
-→ edge-tts ur-PK-UzmaNeural voice (free) → subtitles + Ken Burns video (ffmpeg)
+→ edge-tts hi-IN-SwaraNeural voice (free) + NASA image library (real photos) → subtitles + Ken Burns video (ffmpeg)
 → YouTube upload (YouTube Data API v3) → Google Drive backup
 ```
 
@@ -137,7 +137,7 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 
 | Cheez | Kaise |
 |---|---|
-| Voice | `vars.TTS_VOICE`: `ur-PK-UzmaNeural` (Urdu female), `hi-IN-MadhurNeural`, `en-IN-NeerjaNeural` |
+| Voice | ars.TTS_VOICE: hi-IN-SwaraNeural (Hindi female), hi-IN-MadhurNeural, en-IN-NeerjaNeural |
 | Video length | `vars.TARGET_MINUTES` (22 default, >=15 uses chunked 3-part LLM generation) |
 | Shorts | automatic 3/day (9 AM / 1 PM / 6 PM PKT) via `.github/workflows/shorts.yml` |
 | Quizzes | automatic daily generation; file in `quizzes/` — copy into Studio → Community → Poll (manual) |
@@ -161,7 +161,7 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 
 ## Files
 
-- `generate_episode.py` — main pipeline (long-form Hinglish/Urdu script, photorealistic images, ur-PK voice)
+- `generate_episode.py` — main pipeline (long-form spoken Hindi (Devanagari), NASA library images (Pollinations + local starfield fallback), hi-IN voice)
 - `generate_short.py` — vertical Shorts pipeline (1080x1920)
 - `update_state.py` — atomic episode state persistence (fetch-recompute-retry)
 - `generate_quiz.py` — 2 daily cosmos/philosophy quizzes, writes `quizzes/quiz-YYYY-MM-DD.md`

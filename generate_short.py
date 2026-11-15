@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ahsin Akhlaq — Universe & Philosophy SHORTS Automation
-Pipeline: LLM (45-55s vertical Short, Urdu-English) -> photorealistic vertical images
-          -> edge-tts ur-PK voice -> 1080x1920 Ken Burns video w/ big captions + BGM
+Pipeline: LLM (45-55s vertical Short, Hindi-English) -> NASA image library (Pollinations fallback, local starfield last resort)
+          -> edge-tts hi-IN voice -> 1080x1920 Ken Burns video w/ big captions + BGM
           -> YouTube upload (auto-detected Short because 9:16 & <60s)
 Run locally (test):  DRY_RUN=1 python generate_short.py
 """
@@ -27,7 +27,7 @@ FALLBACK_MODELS    = [m for m in [
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
 ] ]
-VOICE              = os.environ.get("TTS_VOICE", "ur-PK-UzmaNeural")
+VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")
 TTS_RATE           = os.environ.get("TTS_RATE", "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
@@ -154,23 +154,95 @@ def extract_json(text):
         raise RuntimeError("no JSON in reply: " + text[:1200])
     return json.loads(text[s:e+1])
 
-def gen_image(prompt, dest, seed):
-    url = ("https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt)
-           + f"?width={W}&height={H}&nologo=true&seed={seed}&model=flux")
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=150) as r:
-                data = r.read()
-            if len(data) > 15_000:
-                dest.write_bytes(data)
-                return True
-            raise RuntimeError("too small")
-        except Exception as e:
-            backoff = [10, 20, 35][min(attempt, 2)]
-            log(f"image retry {attempt+1}/3 (waiting {backoff}s): {e}")
-            time.sleep(backoff)
+def _http_get(url, timeout=90, min_bytes=15_000):
+    req = urllib.request.Request(url, headers={"User-Agent": "UniverseExplorerBot/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = r.read()
+    if len(data) < min_bytes:
+        raise RuntimeError(f"too small ({len(data)} bytes)")
+    if data[:2] not in (b"\xff\xd8", b"\x89P"):
+        raise RuntimeError(f"not an image: {data[:32]!r}")
+    return data
+
+def _nasa_image(query, dest):
+    """Real space photos from the NASA image library (free, no key, public domain)."""
+    if not query:
+        return False
+    search = ("https://images-api.nasa.gov/search?q=" + urllib.parse.quote(query)
+              + "&media_type=image&page_size=12")
+    req = urllib.request.Request(search, headers={"User-Agent": "UniverseExplorerBot/1.0"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = json.loads(r.read())
+    items = data.get("collection", {}).get("items", [])
+    for size_pref in ("~large.jpg", "~medium.jpg", "~small.jpg"):
+        for item in items:
+            for link in item.get("links", []):
+                href = (link.get("href") or "").strip()
+                if href.lower().endswith(size_pref):
+                    try:
+                        dest.write_bytes(_http_get(href, timeout=120, min_bytes=20_000))
+                        return True
+                    except Exception:
+                        continue
     return False
+
+def _starfield_image(dest, seed):
+    import random as _r
+    from PIL import Image, ImageDraw, ImageFilter
+    rnd = _r.Random(seed)
+    img = Image.new("RGB", (W, H))
+    px = img.load()
+    top, bottom = (10, 16, 48), (2, 4, 14)
+    for y in range(H):
+        t = y / (H - 1)
+        row = tuple(int(top[c] + (bottom[c] - top[c]) * t) for c in range(3))
+        for x in range(W):
+            px[x, y] = row
+    overlay = Image.new("RGB", (W, H), (0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    for _ in range(4):
+        cx, cy = rnd.randint(0, W), rnd.randint(0, H)
+        rx, ry = rnd.randint(W // 5, W // 2), rnd.randint(H // 5, H // 2)
+        hue = rnd.choice([(80, 40, 160), (30, 90, 170), (150, 60, 120), (20, 120, 150)])
+        od.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=hue)
+    overlay = overlay.filter(ImageFilter.GaussianBlur(120))
+    img = Image.blend(img, Image.blend(img, overlay, 0.55), 0.6)
+    d = ImageDraw.Draw(img)
+    for _ in range(700):
+        x, y = rnd.randint(0, W - 1), rnd.randint(0, H - 1)
+        b = rnd.choice([110, 150, 190, 230, 255])
+        d.point((x, y), fill=(b, b, b))
+    for _ in range(50):
+        x, y = rnd.randint(2, W - 3), rnd.randint(2, H - 3)
+        r = rnd.choice([1, 2, 3])
+        d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255))
+    img.save(dest, "PNG")
+    return True
+
+def gen_image(prompt, dest, seed, query=None):
+    try:
+        if _nasa_image(query or prompt, dest):
+            log("image from NASA library:", (query or prompt)[:60])
+            return True
+    except Exception as e:
+        log("NASA image lookup failed, trying generators:", e)
+    for attempt in range(2):
+        try:
+            url = ("https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt)
+                   + f"?width={W}&height={H}&nologo=true&seed={seed}")
+            dest.write_bytes(_http_get(url, timeout=150, min_bytes=15_000))
+            log("image from Pollinations")
+            return True
+        except Exception as e:
+            log(f"pollinations attempt {attempt+1}/2 failed: {e}")
+            time.sleep(6)
+    try:
+        _starfield_image(dest, seed)
+        log("image = local starfield fallback")
+        return True
+    except Exception as e:
+        log("starfield fallback failed:", e)
+        return False
 
 def media_duration(path):
     out = subprocess.check_output(
@@ -224,7 +296,7 @@ def build_video(image_paths, audio, srt, out_mp4):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Nastaliq Urdu,FontSize=22,Bold=-1,PrimaryColour=&H00FFFFFF,"
+    sub_style = ("FontName=Noto Sans Devanagari,FontSize=22,Bold=-1,PrimaryColour=&H00FFFFFF,"
                  "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=70")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
@@ -330,8 +402,8 @@ def main():
 
     sys_prompt = (
         f"You are a viral YouTube Shorts writer for '{CHANNEL_NAME}', a cosmic deep-dive channel. "
-        "You write SHORT (under 55 seconds) vertical videos in expert-level Urdu script with English technical terms "
-        "(e.g., 'black hole', 'redshift'). You are a master of the first-second hook. "
+        "You write SHORT (under 55 seconds) vertical videos in clear, spoken Hindi (Devanagari script) with English technical terms "
+        "(e.g., 'black hole', 'redshift'). Simple words, short sentences, natural second-person address. You are a master of the first-second hook. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
     user_prompt = f"""Write one vertical YouTube Short in this exact JSON shape:
@@ -339,8 +411,9 @@ def main():
  "title": "ENGLISH title, max 60 chars, curiosity gap, e.g. 'Why the sky isn't gray at night'",
  "description": "1-2 line hook + 1 subscribe CTA line, max 500 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, or synthetic content.",
  "tags": ["max 10 tags, ENGLISH ONLY"],
- "narration": "~110-130 words of Urdu script with English technical terms in Latin script. Dense, punchy, no fluff. Absolutely MUST open with a hard-hitting hook in the first sentence. End with a thought-provoking question or quote. Do NOT repeat the title verbatim.",
+ "narration": "~110-130 words of clear spoken Hindi (Devanagari script) with English technical terms in Latin script. Dense, punchy, no fluff. Absolutely MUST open with a hard-hitting hook in the first sentence. End with a thought-provoking question or quote. Do NOT repeat the title verbatim.",
  "image_prompts": ["5 SHORT vertical photorealistic prompts: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>"],
+  "image_queries": ["5 SHORT NASA-image-library search phrases matching the prompts, each 2-4 words, e.g. 'voyager spacecraft', 'webb deep field'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic vertical photorealistic thumbnail prompt, no text, no watermark"
 }}
 
@@ -362,13 +435,15 @@ Angle: {angle}"""
     log("narration words:", len(ep["narration"].split()))
 
     prompts = ep["image_prompts"][:N_IMAGES]
+    queries = ep.get("image_queries") or []
     image_paths = []
     seed0 = random.randint(1000, 999999)
     for i, p in enumerate(prompts):
         dest = WORK / f"img_{i:02d}.png"
-        if gen_image(p + ", photorealistic, cinematic, vertical, dramatic lighting, ultra detailed, no text, no watermark", dest, seed0 + i):
+        q = queries[i] if i < len(queries) else None
+        if gen_image(p + ", photorealistic, cinematic, vertical, dramatic lighting, ultra detailed, no text, no watermark", dest, seed0 + i, query=q):
             image_paths.append(dest)
-        time.sleep(3)
+        time.sleep(2)
     if len(image_paths) < 3:
         sys.exit(f"only {len(image_paths)} images generated - aborting")
 
@@ -376,9 +451,26 @@ Angle: {angle}"""
     (WORK / "narration.txt").write_text(narration, encoding="utf-8")
 
     mp3, srt = WORK / "short.mp3", WORK / "short.srt"
-    subprocess.run([sys.executable, "-m", "edge_tts", "--file", str(WORK / "narration.txt"),
-                    "--write-media", str(mp3), "--write-subtitles", str(srt),
-                    "--voice", VOICE, f"--rate={TTS_RATE}"], check=True)
+    voices = [VOICE] + [v for v in ("hi-IN-SwaraNeural", "hi-IN-MadhurNeural", "ur-PK-UzmaNeural") if v != VOICE]
+    tts_ok = False
+    last_err = None
+    for voice in voices:
+        for attempt in range(2):
+            try:
+                subprocess.run([sys.executable, "-m", "edge_tts", "--file", str(WORK / "narration.txt"),
+                                "--write-media", str(mp3), "--write-subtitles", str(srt),
+                                "--voice", voice, f"--rate={TTS_RATE}"], check=True)
+                log(f"TTS OK with voice {voice}")
+                tts_ok = True
+                break
+            except subprocess.CalledProcessError as e:
+                last_err = e
+                log(f"TTS attempt {attempt+1}/2 with {voice} failed ({e}) - retrying")
+                time.sleep(5)
+        if tts_ok:
+            break
+    if not tts_ok:
+        sys.exit(f"edge-tts failed for every voice; last error: {last_err}")
 
     out_mp4 = WORK / f"short_{ep_id}.mp4"
     build_video(image_paths, mp3, srt, out_mp4)
