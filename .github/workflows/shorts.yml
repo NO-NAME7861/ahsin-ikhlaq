@@ -54,7 +54,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
-          TTS_VOICE: ${{ vars.TTS_VOICE || 'ur-PK-UzmaNeural' }}
+          TTS_VOICE: ${{ vars.TTS_VOICE || 'hi-IN-SwaraNeural' }}
           PRIVACY_STATUS: ${{ inputs.privacy || vars.PRIVACY_STATUS || 'public' }}
           SHORTS_TOPIC: ${{ inputs.shorts_topic || '' }}
           UPLOAD: "1"

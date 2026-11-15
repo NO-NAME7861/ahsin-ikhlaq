@@ -1,10 +1,10 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Ahsin Akhlaq â€” Universe & Philosophy Automation
+Ahsin Akhlaq — Universe & Philosophy Automation
 Pipeline: LLM script (expert-level cosmology + philosophy, Hindi + English terms)
-          -> photorealistic images -> edge-tts ur-PK voice
-          -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
+          -> NASA image library (real photos; Pollinations fallback, local starfield last resort)
+          -> edge-tts Hindi voice -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
 Run locally (test):  DRY_RUN=1 python generate_episode.py
 Run in CI:           private run first, then set UPLOAD=1
 """
@@ -28,10 +28,10 @@ OPENROUTER_MODEL   = os.environ.get("OPENROUTER_MODEL", "google/gemma-4-31b-it:f
 CF_ACCOUNT_ID      = os.environ.get("CF_ACCOUNT_ID", "").strip()
 CF_API_TOKEN       = os.environ.get("CF_API_TOKEN", "").strip()
 FALLBACK_MODELS    = [m for m in [
-    "google/gemma-4-31b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3.5-lightning:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
 ] ]
 VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")   # Hindi female voice
 TTS_RATE           = os.environ.get("TTS_RATE", "-5%")
@@ -130,6 +130,31 @@ def _call_llm_once(model, row, sys_prompt, user_prompt, max_tokens=7500, expect_
         raise RuntimeError("no JSON in reply: " + content[:1500])
     return json.loads(content[start:end + 1])
 
+def _ensure_narration_length(row, sys_prompt, ep):
+    """If the narration came out too short, ask the LLM for one expanded rewrite."""
+    narr = (ep.get("narration") or "").strip()
+    wc = len(narr.split())
+    floor = int(WORDS_TARGET * 0.75)
+    if wc >= floor:
+        return ep
+    log(f"narration too short ({wc} words < {floor}) - requesting an expanded version")
+    expand_prompt = f"""Below is a narration draft ({wc} words) for this episode. REWRITE and EXPAND it to a MINIMUM of {WORDS_TARGET} words in clear spoken Hindi (Devanagari script) with English technical terms in Latin script. Keep every fact accurate (no claims beyond the draft's scope), keep the 6-10 scene paragraph structure, keep the warm second-person 'aap' voice. Reply ONLY with the expanded narration as plain text - no JSON, no markdown, no commentary.
+
+Episode topic: {row['topic']}
+Central insight: {row['moral']}
+
+DRAFT NARRATION:
+{narr}"""
+    try:
+        expanded = _llm_with_fallback(sys_prompt, expand_prompt, 8000, "expand", expect_json=False)
+        w2 = len(expanded.split())
+        log(f"expanded narration: {w2} words (was {wc})")
+        if w2 > wc:
+            ep["narration"] = expanded.strip()
+    except SystemExit as e:
+        log(f"expand failed, keeping original {wc}-word narration: {e}")
+    return ep
+
 def call_llm(row):
     sys_prompt = (
         f"You are a world-class science communicator and philosopher writing for the YouTube channel '{CHANNEL_NAME}', "
@@ -150,9 +175,11 @@ def call_llm(row):
  "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
  "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence â€” the episode's central philosophical insight",
- "narration": "{WORDS_TARGET} words (Â±10%) continuous narration in clear, spoken Hindi with English technical terms in Latin script. WRITTEN IN Devanagari Hindi (Devanagari script) with English technical terms in Latin script (such as: black hole, redshift, entropy). Simple words, short sentences, warm second-person address: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
+ "narration": "MINIMUM {WORDS_TARGET} words (do NOT stop early),Â±10%) continuous narration in clear, spoken Hindi with English technical terms in Latin script. WRITTEN IN Devanagari Hindi (Devanagari script) with English technical terms in Latin script (such as: black hole, redshift, entropy). Simple words, short sentences, warm second-person address: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
- "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark"
+  "image_queries": ["{n_img_prompts} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
+ "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
+  "thumbnail_query": "2-4 word NASA search phrase for the thumbnail, e.g. 'earth from space'"
 }}
 
 Episode brief (topic + central insight):
@@ -164,7 +191,8 @@ Central insight: {row['moral']}"""
         log("LLM OK via long-form mode (3 narrations stitched)")
         return ep
 
-    return _llm_with_fallback(sys_prompt, user_prompt, 8000, "episode")
+    ep = _llm_with_fallback(sys_prompt, user_prompt, 8000, "episode")
+    return _ensure_narration_length(row, sys_prompt, ep)
 
 # ---- long-form (50-minute) mode -------------------------------------------
 
@@ -192,7 +220,9 @@ def call_llm_long(row, sys_prompt, _unused):
  "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence â€” the episode's central philosophical insight",
  "image_prompts": ["{N_IMAGES} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>. Space imagery throughout."],
+  "image_queries": ["{n_img_prompts} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
+  "thumbnail_query": "2-4 word NASA search phrase for the thumbnail, e.g. 'earth from space'",
  "outline": ["8 scene summaries with the key scientific facts, numbers and philosophers to cover, in order â€” this is the plan for the 3 narrative parts"]
 }}
 
@@ -216,7 +246,7 @@ FULL OUTLINE (do NOT repeat what other parts cover â€” write ONLY your assi
 PART {part_no} ASSIGNMENT:
 {'Open the episode with a powerful hook. Cover outline scenes 1-3. End part 1 on a cliffhanger.' if part_no == 1 else ('Continue from part 1. Cover outline scenes 4-6. Keep tension rising. End part 2 mid-crescendo.' if part_no == 2 else 'Now land the plane. Cover the remaining outline scenes. End with the central philosophical insight, delivered with awe.')}
 
-Reply with plain text ONLY (no JSON, no markdown) - just the narration in Urdu script with English terms in Latin script, ready for voiceover."""
+Reply with plain text ONLY (no JSON, no markdown) - just the narration in clear spoken Hindi (Devanagari script) with English terms in Latin script, ready for voiceover."""
         part = _llm_with_fallback(sys_prompt, part_prompt, 6000, f"narration-part-{part_no}", expect_json=False)
         parts.append(part.strip())
 
@@ -247,43 +277,139 @@ def _cf_image(prompt, dest, seed):
     dest.write_bytes(base64.b64decode(img_b64))
     return True
 
-def _pollinations_image(prompt, dest, seed):
-    url = ("https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt)
-           + f"?width={W}&height={H}&nologo=true&seed={seed}")
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=180) as r:
+def _http_get(url, timeout=90, min_bytes=15_000):
+    req = urllib.request.Request(url, headers={"User-Agent": "UniverseExplorerBot/1.0 (https://github.com/NO-NAME7861/universe-explorer)"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         data = r.read()
-    if len(data) <= 20_000:
-        raise RuntimeError(f"pollinations too small: {len(data)} bytes")
-    dest.write_bytes(data)
+    if len(data) < min_bytes:
+        raise RuntimeError(f"too small ({len(data)} bytes): {url[:120]}")
+    # sanity: JPEG (FF D8) or PNG (89 50)
+    if data[:2] not in (b"\xff\xd8", b"\x89P"):
+        raise RuntimeError(f"not an image ({data[:32]!r}): {url[:120]}")
+    return data
+
+def _nasa_image(query, dest):
+    """Fetch a real space photo from the NASA image library (free, no key, public domain)."""
+    if not query:
+        return False
+    search = ("https://images-api.nasa.gov/search?q=" + urllib.parse.quote(query)
+              + "&media_type=image&page_size=12")
+    req = urllib.request.Request(search, headers={"User-Agent": "UniverseExplorerBot/1.0"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = json.loads(r.read())
+    items = data.get("collection", {}).get("items", [])
+    for size_pref in ("~large.jpg", "~medium.jpg", "~small.jpg"):
+        for item in items:
+            for link in item.get("links", []):
+                href = (link.get("href") or "").strip()
+                if href.lower().endswith(size_pref):
+                    try:
+                        img = _http_get(href, timeout=120, min_bytes=20_000)
+                        dest.write_bytes(img)
+                        return True
+                    except Exception:
+                        continue
+    # last NASA chance: any .jpg href we can find
+    for item in items:
+        for link in item.get("links", []):
+            href = (link.get("href") or "").strip()
+            if href.lower().endswith(".jpg"):
+                try:
+                    img = _http_get(href, timeout=120, min_bytes=20_000)
+                    dest.write_bytes(img)
+                    return True
+                except Exception:
+                    continue
+    return False
+
+def _starfield_image(dest, seed):
+    """Bulletproof local fallback: deep-space gradient + stars rendered with PIL."""
+    import random
+    from PIL import Image, ImageDraw, ImageFilter
+    rnd = random.Random(seed)
+    top, bottom = (10, 16, 48), (2, 4, 14)   # deep indigo -> near black
+    img = Image.new("RGB", (W, H))
+    px = img.load()
+    for y in range(H):
+        t = y / (H - 1)
+        px_row = tuple(int(top[c] + (bottom[c] - top[c]) * t) for c in range(3))
+        for x in range(W):
+            px[x, y] = px_row
+    # soft nebula glows
+    overlay = Image.new("RGB", (W, H), (0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    for _ in range(4):
+        cx, cy = rnd.randint(0, W), rnd.randint(0, H)
+        rx, ry = rnd.randint(W // 5, W // 2), rnd.randint(H // 5, H // 2)
+        hue = rnd.choice([(80, 40, 160), (30, 90, 170), (150, 60, 120), (20, 120, 150)])
+        od.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=hue)
+    overlay = overlay.filter(ImageFilter.GaussianBlur(120))
+    img = Image.blend(img, Image.blend(img, overlay, 0.55), 0.6)
+    d = ImageDraw.Draw(img)
+    # stars
+    for _ in range(420):
+        x, y = rnd.randint(0, W - 1), rnd.randint(0, H - 1)
+        b = rnd.choice([110, 150, 190, 230, 255])
+        d.point((x, y), fill=(b, b, b))
+    for _ in range(40):
+        x, y = rnd.randint(2, W - 3), rnd.randint(2, H - 3)
+        r = rnd.choice([1, 1, 2])
+        d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255))
+    # a few hero stars with cross glare
+    for _ in range(5):
+        x, y = rnd.randint(40, W - 40), rnd.randint(40, H - 40)
+        d.line([(x - 14, y), (x + 14, y)], fill=(230, 230, 255), width=1)
+        d.line([(x, y - 14), (x, y + 14)], fill=(230, 230, 255), width=1)
+        d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(255, 255, 255))
+    img.save(dest, "PNG")
     return True
 
-def gen_image(prompt, dest, seed):
-    for attempt in range(3):
+def gen_image(prompt, dest, seed, query=None):
+    """1) NASA image library (real photos)  2) Pollinations  3) local starfield (always works)."""
+    try:
+        if _nasa_image(query or prompt, dest):
+            log("image from NASA library:", (query or prompt)[:60])
+            return True
+    except Exception as e:
+        log("NASA image lookup failed, trying generators:", e)
+    for attempt in range(2):
         try:
             url = ("https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt)
                    + f"?width={W}&height={H}&nologo=true&seed={seed}")
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=120) as r:
-                data = r.read()
-            if len(data) > 15_000:
-                dest.write_bytes(data)
-                return True
-            raise RuntimeError("pollinations too small")
+            data = _http_get(url, timeout=150, min_bytes=15_000)
+            dest.write_bytes(data)
+            log("image from Pollinations")
+            return True
         except Exception as e:
-            backoff = [12, 25, 45][min(attempt, 2)]
-            log(f"image retry {attempt + 1}/3 (waiting {backoff}s): {e}")
-            time.sleep(backoff)
-    log("WARNING: image failed after retries:", prompt[:60])
-    return False
+            log(f"pollinations attempt {attempt + 1}/2 failed: {e}")
+            time.sleep(8)
+    try:
+        _starfield_image(dest, seed)
+        log("image = local starfield fallback (all online sources failed)")
+        return True
+    except Exception as e:
+        log("WARNING: even starfield fallback failed:", e)
+        return False
 
 # ---------------------------------------------------------------- 3. voice
 
 def run_tts(text_file, mp3, srt):
-    cmd = [sys.executable, "-m", "edge_tts", "--file", str(text_file),
-           "--write-media", str(mp3), "--write-subtitles", str(srt),
-           "--voice", VOICE, f"--rate={TTS_RATE}"]
-    subprocess.run(cmd, check=True)
+    voices = [VOICE] + [v for v in ("hi-IN-SwaraNeural", "hi-IN-MadhurNeural", "ur-PK-UzmaNeural", "en-GB-SoniaNeural") if v != VOICE]
+    last_err = None
+    for voice in voices:
+        for attempt in range(2):
+            try:
+                cmd = [sys.executable, "-m", "edge_tts", "--file", str(text_file),
+                       "--write-media", str(mp3), "--write-subtitles", str(srt),
+                       "--voice", voice, f"--rate={TTS_RATE}"]
+                subprocess.run(cmd, check=True)
+                log(f"TTS OK with voice {voice}")
+                return
+            except subprocess.CalledProcessError as e:
+                last_err = e
+                log(f"TTS attempt {attempt + 1}/2 with {voice} failed ({e}) - retrying")
+                time.sleep(5)
+    sys.exit(f"edge-tts failed for every voice ({voices}); last error: {last_err}")
 
 def media_duration(path):
     out = subprocess.check_output(
@@ -500,13 +626,15 @@ def main():
     log(f"narration words: {len(narration.split())}")
 
     prompts = ep["image_prompts"][:N_IMAGES]
+    queries = ep.get("image_queries") or []
     image_paths = []
     seed0 = random.randint(1000, 999999)
     for i, p in enumerate(prompts):
         dest = WORK / f"img_{i:02d}.png"
-        if gen_image(p + IMAGE_SUFFIX, dest, seed0 + i):
+        q = queries[i] if i < len(queries) else None
+        if gen_image(p + IMAGE_SUFFIX, dest, seed0 + i, query=q):
             image_paths.append(dest)
-        time.sleep(4)
+        time.sleep(2)
     if len(image_paths) < 8:
         sys.exit(f"only {len(image_paths)} images generated - aborting")
 
@@ -514,7 +642,8 @@ def main():
     run_tts(WORK / "narration.txt", mp3, srt)
 
     thumb = WORK / "thumb.png"
-    gen_image(ep.get("thumbnail_prompt", prompts[0]) + THUMB_SUFFIX, thumb, seed0 + 999)
+    thumb_q = ep.get("thumbnail_query") or (queries[0] if queries else "galaxy cosmos")
+    gen_image(ep.get("thumbnail_prompt", prompts[0]) + THUMB_SUFFIX, thumb, seed0 + 999, query=thumb_q)
 
     out_mp4 = WORK / f"episode_{row['id']}.mp4"
     build_video(image_paths, mp3, srt, out_mp4, thumb)
