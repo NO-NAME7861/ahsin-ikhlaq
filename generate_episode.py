@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Ahsin Akhlaq — Universe & Philosophy Automation
-Pipeline: LLM script (expert-level cosmology + philosophy, Urdu + English terms)
+Ahsin Akhlaq â€” Universe & Philosophy Automation
+Pipeline: LLM script (expert-level cosmology + philosophy, Hindi + English terms)
           -> photorealistic images -> edge-tts ur-PK voice
           -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
 Run locally (test):  DRY_RUN=1 python generate_episode.py
@@ -33,7 +33,7 @@ FALLBACK_MODELS    = [m for m in [
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3.5-lightning:free",
 ] ]
-VOICE              = os.environ.get("TTS_VOICE", "ur-PK-UzmaNeural")   # Urdu female voice
+VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")   # Hindi female voice
 TTS_RATE           = os.environ.get("TTS_RATE", "-5%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")  # safe default; set public when confident
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
@@ -64,7 +64,7 @@ def scrub_ai_text(text):
     out = text
     for pattern in AI_PHRASES:
         out = re.sub(pattern, "", out, flags=re.IGNORECASE)
-    out = re.sub(r"\s{2,}", " ", out).strip(" -—:,.;")
+    out = re.sub(r"\s{2,}", " ", out).strip(" -â€”:,.;")
     return out or text
 
 def load_episode():
@@ -135,11 +135,11 @@ def call_llm(row):
         f"You are a world-class science communicator and philosopher writing for the YouTube channel '{CHANNEL_NAME}', "
         "a deep-dive channel that merges cutting-edge universe exploration and space science with profound philosophy. "
         "You combine the rigor of a cosmology textbook, the storytelling of Carl Sagan, and the depth of a philosophy "
-        "seminar. You write for a Pakistani and Urdu-speaking audience in expert-level Urdu: the narration is written "
-        "in Urdu script (Nastaliq) with English technical terms left in Latin script (e.g., 'black hole', 'entropy', "
-        "'dark matter', 'fine-tuning'). You NEVER use Devanagari/Hindi. You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
+        "seminar. You write for a Hindi-speaking Indian and Pakistani audience in CLEAR, SPOKEN HINDI (Devanagari script) with English technical terms embedded naturally (e.g., 'black hole', 'entropy', 'dark matter', 'fine-tuning'). You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
         "Event Horizon Telescope, New Horizons), real scientists (Einstein, Sagan, Hawking, Noether), real theories, real "
         "numbers and dates. If a fact is uncertain or debated, say so honestly. "
+        "Use SIMPLE HINDI that a 12-year-old can understand. Short sentences. Avoid Sanskritized heavy words. "
+        "Natural spoken rhythm: second-person 'aap', rhetorical questions, breath-catching pauses. "
         "Never use phrases like 'AI-generated', 'AI content', 'AI narration', or 'artificial intelligence' in the title or description. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
@@ -149,8 +149,8 @@ def call_llm(row):
  "title": "YouTube title, max 70 chars, expert curiosity-gap ENGLISH ONLY, e.g. 'What Happens Inside a Black Hole? The Information Paradox Explained'",
  "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
  "tags": ["max 15 tags, ENGLISH ONLY"],
- "moral": "one sentence — the episode's central philosophical insight",
- "narration": "{WORDS_TARGET} words (±10%) continuous narration in expert-level Urdu with English technical terms in Latin script. WRITTEN IN URDU SCRIPT (Nastaliq) with English technical terms in Latin script (such as: 'black hole', 'redshift', 'entropy'). Natural spoken rhythm: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
+ "moral": "one sentence â€” the episode's central philosophical insight",
+ "narration": "{WORDS_TARGET} words (Â±10%) continuous narration in clear, spoken Hindi with English technical terms in Latin script. WRITTEN IN Devanagari Hindi (Devanagari script) with English technical terms in Latin script (such as: black hole, redshift, entropy). Simple words, short sentences, warm second-person address: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark"
 }}
@@ -190,10 +190,10 @@ def call_llm_long(row, sys_prompt, _unused):
  "title": "YouTube title, max 70 chars, expert curiosity-gap ENGLISH ONLY",
  "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
  "tags": ["max 15 tags, ENGLISH ONLY"],
- "moral": "one sentence — the episode's central philosophical insight",
+ "moral": "one sentence â€” the episode's central philosophical insight",
  "image_prompts": ["{N_IMAGES} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>. Space imagery throughout."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
- "outline": ["8 scene summaries with the key scientific facts, numbers and philosophers to cover, in order — this is the plan for the 3 narrative parts"]
+ "outline": ["8 scene summaries with the key scientific facts, numbers and philosophers to cover, in order â€” this is the plan for the 3 narrative parts"]
 }}
 
 Topic seed: {row['topic']}
@@ -205,12 +205,12 @@ Central insight: {row['moral']}"""
     parts = []
     for part_no in (1, 2, 3):
         part_prompt = f"""You are writing PART {part_no} of 3 narration parts for ONE 50-minute deep-dive episode
-(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (±10%), expert-level Urdu with English technical terms in Latin script, natural spoken rhythm, paragraph breaks every few sentences).
+(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (Â±10%), clear spoken Hindi (Devanagari script) with English terms in Latin script, natural spoken rhythm, paragraph breaks every few sentences).
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
 
-FULL OUTLINE (do NOT repeat what other parts cover — write ONLY your assigned scenes):
+FULL OUTLINE (do NOT repeat what other parts cover â€” write ONLY your assigned scenes):
 {outline_txt}
 
 PART {part_no} ASSIGNMENT:
@@ -226,7 +226,7 @@ Reply with plain text ONLY (no JSON, no markdown) - just the narration in Urdu s
     wc = len(ep["narration"].split())
     log(f"long-form narration assembled: {wc} words")
     if wc < WORDS_TARGET * 0.6:
-        log("WARNING: narration shorter than expected — video may be shorter than target")
+        log("WARNING: narration shorter than expected â€” video may be shorter than target")
     return ep
 
 # ---------------------------------------------------------------- 2. images
@@ -346,7 +346,7 @@ def build_video(image_paths, audio, srt, out_mp4, thumb):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Nastaliq Urdu,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
+    sub_style = ("FontName=Noto Sans Devanagari,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
                  "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=22")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
