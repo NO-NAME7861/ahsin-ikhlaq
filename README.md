@@ -1,10 +1,10 @@
 # Ahsin Akhlaq — Universe & Philosophy YouTube Automation
 
-Naya channel: **Universe Explorer + Philosophy** — simple spoken Hindi (Devanagari) + English deep-dives (clear Hindi narration with English technical terms).
+Naya channel: **Universe Explorer + Philosophy** — Romanized Hindi-Urdu (Latin script) + English deep-dives (Roman Hinglish narration with English technical terms).
 
 ```
 LLM (OpenRouter free) → photorealistic images (Pollinations, free)
-→ edge-tts hi-IN-SwaraNeural voice (free) + NASA image library (real photos) → subtitles + Ken Burns video (ffmpeg)
+→ edge-tts en-IN-NeerjaExpressiveNeural voice (free) + NASA image library (real photos) → subtitles + Ken Burns video (ffmpeg)
 → YouTube upload (YouTube Data API v3) → Google Drive backup
 ```
 
@@ -79,7 +79,7 @@ gh secret set OPENROUTER_API_KEY
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\token.json")) | gh secret set YOUTUBE_TOKEN_JSON
 
 # 3) (Optional) voice badalni ho to:
-gh variable set TTS_VOICE --body "hi-IN-SwaraNeural"
+gh variable set TTS_VOICE --body "en-IN-NeerjaExpressiveNeural"
 ```
 
 ### STEP 7 — Pehla run (PRIVATE!)
@@ -104,7 +104,7 @@ gh variable set TARGET_MINUTES --body "22"
 
 Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 50** likh do.
 
-**Kaam kaise karta hai**: free models ek response mein 7000+ words nahi de sakte, isliye long mode pehle metadata + 8-scene outline banata hai, phir narration **3 parts (~2400 words each)** mein generate karke stitch karta hai (Devanagari Hindi, same Hinglish style). `N_IMAGES` default 16 → 20 ho jata hai (env se override kar sakte hain). CI timeout 300 min set hai.
+**Kaam kaise karta hai**: free models ek response mein 7000+ words nahi de sakte, isliye long mode pehle metadata + 8-scene outline banata hai, phir narration **3 parts (~2400 words each)** mein generate karke stitch karta hai (Romanized Hindi-Urdu, same Hinglish style). `N_IMAGES` default 16 → 20 ho jata hai (env se override kar sakte hain). CI timeout 300 min set hai.
 
 **Practical notes**:
 - Render time ~1.5–3 ghante (GitHub Actions pe); file size ~250–400MB — YouTube resumable upload handle karega
@@ -137,7 +137,7 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 
 | Cheez | Kaise |
 |---|---|
-| Voice | ars.TTS_VOICE: hi-IN-SwaraNeural (Hindi female), hi-IN-MadhurNeural, en-IN-NeerjaNeural |
+| Voice | | Voice | `vars.TTS_VOICE`: `en-IN-NeerjaExpressiveNeural` (Indian expressive female), `en-IN-NeerjaNeural`, `en-IN-PrabhatNeural` |
 | Video length | `vars.TARGET_MINUTES` (22 default, >=15 uses chunked 3-part LLM generation) |
 | Shorts | automatic 3/day (9 AM / 1 PM / 6 PM PKT) via `.github/workflows/shorts.yml` |
 | Quizzes | automatic daily generation; file in `quizzes/` — copy into Studio → Community → Poll (manual) |
@@ -153,7 +153,7 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 |---|---|
 | `token.json missing` | Step 5 dobara — **naye account ke Incognito profile** mein |
 | `invalid_grant` | App Testing mode mein hai → Publish app → token dobara |
-| Devanagari subtitle boxes (boxes/symbols) | Workflow already `fonts-noto-core` install karti hai; local PC pe Arial Devanagari support karta hai |
+| Missing/hidden subtitle fonts | Workflow already `fonts-noto-core` install karti hai; local PC pe Noto Sans present hota hai |
 | LLM factual error | `episodes.csv` brief mein exact fact likhein (numbers/missions) |
 | LLM returns no JSON | `OPENROUTER_MODEL` variable set karein (e.g. `qwen/qwen-2.5-72b-instruct:free`) |
 | Upload forbidden | Naye account ka channel verified/active hai? APIs enabled? `youtube.upload` scope consent screen mein? |
@@ -161,7 +161,7 @@ Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 
 
 ## Files
 
-- `generate_episode.py` — main pipeline (long-form spoken Hindi (Devanagari), NASA library images (Pollinations + local starfield fallback), hi-IN voice)
+- `generate_episode.py` — main pipeline (long-form Romanized Hindi-Urdu (Latin script), NASA library images (Pollinations + local starfield fallback), en-IN Neerja expressive voice)
 - `generate_short.py` — vertical Shorts pipeline (1080x1920)
 - `update_state.py` — atomic episode state persistence (fetch-recompute-retry)
 - `generate_quiz.py` — 2 daily cosmos/philosophy quizzes, writes `quizzes/quiz-YYYY-MM-DD.md`

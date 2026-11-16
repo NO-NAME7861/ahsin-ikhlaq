@@ -4,7 +4,7 @@
 Ahsin Akhlaq — Universe & Philosophy Automation
 Pipeline: LLM script (expert-level cosmology + philosophy, Hindi + English terms)
           -> NASA image library (real photos; Pollinations fallback, local starfield last resort)
-          -> edge-tts Hindi voice -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
+          -> edge-tts en-IN Neerja expressive voice -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
 Run locally (test):  DRY_RUN=1 python generate_episode.py
 Run in CI:           private run first, then set UPLOAD=1
 """
@@ -33,7 +33,7 @@ FALLBACK_MODELS    = [m for m in [
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
 ] ]
-VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")   # Hindi female voice
+VOICE              = os.environ.get("TTS_VOICE", "en-IN-NeerjaExpressiveNeural")   # Indian expressive female voice (English/Hinglish/Roman Urdu)
 TTS_RATE           = os.environ.get("TTS_RATE", "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")  # safe default; set public when confident
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
@@ -132,6 +132,38 @@ def _call_llm_once(model, row, sys_prompt, user_prompt, max_tokens=7500, expect_
         raise RuntimeError("no JSON in reply: " + content[:1500])
     return json.loads(content[start:end + 1])
 
+def _has_non_latin_script(text):
+    for ch in text:
+        o = ord(ch)
+        if 0x0900 <= o <= 0x097F or 0x0600 <= o <= 0x06FF or 0x0750 <= o <= 0x077F:
+            return True
+    return False
+
+def _ensure_latin_script(row, sys_prompt, ep):
+    """Neerja voices cannot speak Devanagari/Urdu script - force Latin-script output."""
+    narr = (ep.get("narration") or "").strip()
+    if not _has_non_latin_script(narr):
+        return ep
+    log("narration contains non-Latin script - retrying with a strict romanization instruction")
+    romanize_prompt = f"""Your narration for the episode below contained characters in Devanagari or Urdu script. REWRITE the ENTIRE narration in ROMAN/Latin script transliterated Hindi-Urdu (e.g., 'Dosto, aaj hum sochenge...') - EVERY word must be Latin letters, ZERO Devanagari or Urdu characters. Keep the same content, same 6-10 scene structure, same warm second-person 'aap' voice, same word target of about {WORDS_TARGET} words. Reply ONLY with the narration as plain text - no JSON, no markdown, no commentary.
+
+Episode topic: {row['topic']}
+Central insight: {row['moral']}
+
+Previous narration (for reference, do NOT reuse its script):
+{narr}"""
+    try:
+        fixed = _llm_with_fallback(sys_prompt, romanize_prompt, 8000, "romanize", expect_json=False)
+        fixed = (fixed or "").strip()
+        if fixed and not _has_non_latin_script(fixed):
+            ep["narration"] = fixed
+            log("narration rewritten in Latin script")
+        else:
+            log("WARNING: romanize retry still contains non-Latin chars - TTS may fail")
+    except SystemExit as e:
+        log(f"romanize retry failed: {e}")
+    return ep
+
 def _ensure_narration_length(row, sys_prompt, ep):
     """If the narration came out too short, ask the LLM for one expanded rewrite."""
     narr = (ep.get("narration") or "").strip()
@@ -140,7 +172,7 @@ def _ensure_narration_length(row, sys_prompt, ep):
     if wc >= floor:
         return ep
     log(f"narration too short ({wc} words < {floor}) - requesting an expanded version")
-    expand_prompt = f"""Below is a narration draft ({wc} words) for this episode. REWRITE and EXPAND it to a MINIMUM of {WORDS_TARGET} words in clear spoken Hindi (Devanagari script) with English technical terms in Latin script. Keep every fact accurate (no claims beyond the draft's scope), keep the 6-10 scene paragraph structure, keep the warm second-person 'aap' voice. Reply ONLY with the expanded narration as plain text - no JSON, no markdown, no commentary.
+    expand_prompt = f"""Below is a narration draft ({wc} words) for this episode. REWRITE and EXPAND it to a MINIMUM of {WORDS_TARGET} words in natural Romanized Hindi-Urdu (Latin script, transliterated) with English technical terms. Keep every fact accurate (no claims beyond the draft's scope), keep the 6-10 scene paragraph structure, keep the warm second-person 'aap' voice. Reply ONLY with the expanded narration as plain text - no JSON, no markdown, no commentary.
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
@@ -151,8 +183,10 @@ DRAFT NARRATION:
         expanded = _llm_with_fallback(sys_prompt, expand_prompt, 8000, "expand", expect_json=False)
         w2 = len(expanded.split())
         log(f"expanded narration: {w2} words (was {wc})")
-        if w2 > wc:
+        if w2 > wc and not _has_non_latin_script(expanded):
             ep["narration"] = expanded.strip()
+        elif w2 > wc:
+            log("expanded narration contains non-Latin script - keeping original")
     except SystemExit as e:
         log(f"expand failed, keeping original {wc}-word narration: {e}")
     return ep
@@ -162,7 +196,7 @@ def call_llm(row):
         f"You are a world-class science communicator and philosopher writing for the YouTube channel '{CHANNEL_NAME}', "
         "a deep-dive channel that merges cutting-edge universe exploration and space science with profound philosophy. "
         "You combine the rigor of a cosmology textbook, the storytelling of Carl Sagan, and the depth of a philosophy "
-        "seminar. You write for a Hindi-speaking Indian and Pakistani audience in CLEAR, SPOKEN HINDI (Devanagari script) with English technical terms embedded naturally (e.g., 'black hole', 'entropy', 'dark matter', 'fine-tuning'). You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
+        "seminar. You write for a Hindi-speaking Indian and Pakistani audience in natural, warm ROMANIZED Hindi-Urdu (Latin script, written exactly the way people text in India/Pakistan, e.g. 'Namaste doston, aaj sochenge...') with English technical terms embedded naturally (e.g., 'black hole', 'entropy', 'dark matter', 'fine-tuning'). You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
         "Event Horizon Telescope, New Horizons), real scientists (Einstein, Sagan, Hawking, Noether), real theories, real "
         "numbers and dates. If a fact is uncertain or debated, say so honestly. "
         "Use SIMPLE HINDI that a 12-year-old can understand. Short sentences. Avoid Sanskritized heavy words. "
@@ -177,7 +211,7 @@ def call_llm(row):
  "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
  "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence â€” the episode's central philosophical insight",
- "narration": "EXACTLY {WORDS_TARGET} words (plus-minus 5%) - hard cap {WORDS_TARGET + 150} words; never exceed the cap. continuous narration in clear, spoken Hindi with English technical terms in Latin script. WRITTEN IN Devanagari Hindi (Devanagari script) with English technical terms in Latin script (such as: black hole, redshift, entropy). Simple words, short sentences, warm second-person address: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
+ "narration": "EXACTLY {WORDS_TARGET} words (plus-minus 5%) - hard cap {WORDS_TARGET + 150} words; never exceed the cap. continuous narration in natural, warm ROMANIZED Hindi-Urdu (Latin script, transliterated spelling, e.g. 'Dekhte hain...' - NEVER Devanagari or Urdu script) with English technical terms (black hole, redshift, entropy). Simple words, short sentences, warm second-person address: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
   "image_queries": ["{n_img_prompts} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
@@ -194,6 +228,7 @@ Central insight: {row['moral']}"""
         return ep
 
     ep = _llm_with_fallback(sys_prompt, user_prompt, 8000, "episode")
+    ep = _ensure_latin_script(row, sys_prompt, ep)
     return _ensure_narration_length(row, sys_prompt, ep)
 
 # ---- long-form (50-minute) mode -------------------------------------------
@@ -237,7 +272,7 @@ Central insight: {row['moral']}"""
     parts = []
     for part_no in (1, 2, 3):
         part_prompt = f"""You are writing PART {part_no} of 3 narration parts for ONE 50-minute deep-dive episode
-(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (Â±10%), clear spoken Hindi (Devanagari script) with English terms in Latin script, natural spoken rhythm, paragraph breaks every few sentences).
+(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (Â±10%), natural Romanized Hindi-Urdu (Latin script), natural spoken rhythm, paragraph breaks every few sentences).
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
@@ -248,7 +283,7 @@ FULL OUTLINE (do NOT repeat what other parts cover â€” write ONLY your assi
 PART {part_no} ASSIGNMENT:
 {'Open the episode with a powerful hook. Cover outline scenes 1-3. End part 1 on a cliffhanger.' if part_no == 1 else ('Continue from part 1. Cover outline scenes 4-6. Keep tension rising. End part 2 mid-crescendo.' if part_no == 2 else 'Now land the plane. Cover the remaining outline scenes. End with the central philosophical insight, delivered with awe.')}
 
-Reply with plain text ONLY (no JSON, no markdown) - just the narration in clear spoken Hindi (Devanagari script) with English terms in Latin script, ready for voiceover."""
+Reply with plain text ONLY (no JSON, no markdown) - just the narration in natural Romanized Hindi-Urdu (Latin script), ready for voiceover."""
         part = _llm_with_fallback(sys_prompt, part_prompt, 6000, f"narration-part-{part_no}", expect_json=False)
         parts.append(part.strip())
 
@@ -396,7 +431,7 @@ def gen_image(prompt, dest, seed, query=None):
 # ---------------------------------------------------------------- 3. voice
 
 def run_tts(text_file, mp3, srt):
-    voices = [VOICE] + [v for v in ("hi-IN-SwaraNeural", "hi-IN-MadhurNeural", "ur-PK-UzmaNeural", "en-GB-SoniaNeural") if v != VOICE]
+    voices = [VOICE] + [v for v in ("en-IN-NeerjaNeural", "en-IN-PrabhatNeural") if v != VOICE]
     last_err = None
     for voice in voices:
         for attempt in range(2):
@@ -474,7 +509,7 @@ def build_video(image_paths, audio, srt, out_mp4, thumb):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Sans Devanagari,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
+    sub_style = ("FontName=Noto Sans,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
                  "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=22")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",

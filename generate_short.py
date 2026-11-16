@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ahsin Akhlaq — Universe & Philosophy SHORTS Automation
-Pipeline: LLM (45-55s vertical Short, Hindi-English) -> NASA image library (Pollinations fallback, local starfield last resort)
-          -> edge-tts hi-IN voice -> 1080x1920 Ken Burns video w/ big captions + BGM
+Pipeline: LLM (45-55s vertical Short, Romanized Hindi-Urdu + English) -> NASA image library (Pollinations fallback, local starfield last resort)
+          -> edge-tts en-IN Neerja expressive voice -> 1080x1920 Ken Burns video w/ big captions + BGM
           -> YouTube upload (auto-detected Short because 9:16 & <60s)
 Run locally (test):  DRY_RUN=1 python generate_short.py
 """
@@ -27,7 +27,7 @@ FALLBACK_MODELS    = [m for m in [
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
 ] ]
-VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")
+VOICE              = os.environ.get("TTS_VOICE", "en-IN-NeerjaExpressiveNeural")  # Indian expressive female (Hinglish/Roman Urdu)
 TTS_RATE           = os.environ.get("TTS_RATE", "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
@@ -296,7 +296,7 @@ def build_video(image_paths, audio, srt, out_mp4):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Sans Devanagari,FontSize=22,Bold=-1,PrimaryColour=&H00FFFFFF,"
+    sub_style = ("FontName=Noto Sans,FontSize=22,Bold=-1,PrimaryColour=&H00FFFFFF,"
                  "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=70")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
@@ -402,7 +402,7 @@ def main():
 
     sys_prompt = (
         f"You are a viral YouTube Shorts writer for '{CHANNEL_NAME}', a cosmic deep-dive channel. "
-        "You write SHORT (under 55 seconds) vertical videos in clear, spoken Hindi (Devanagari script) with English technical terms "
+        "You write SHORT (under 55 seconds) vertical videos in natural, warm ROMANIZED Hindi-Urdu (Latin script, transliterated) with English technical terms "
         "(e.g., 'black hole', 'redshift'). Simple words, short sentences, natural second-person address. You are a master of the first-second hook. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
@@ -411,7 +411,7 @@ def main():
  "title": "ENGLISH title, max 60 chars, curiosity gap, e.g. 'Why the sky isn't gray at night'",
  "description": "1-2 line hook + 1 subscribe CTA line, max 500 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, or synthetic content.",
  "tags": ["max 10 tags, ENGLISH ONLY"],
- "narration": "~110-130 words of clear spoken Hindi (Devanagari script) with English technical terms in Latin script. Dense, punchy, no fluff. Absolutely MUST open with a hard-hitting hook in the first sentence. End with a thought-provoking question or quote. Do NOT repeat the title verbatim.",
+ "narration": "~110-130 words of natural Romanized Hindi-Urdu (Latin script, transliterated, e.g. 'doston, universe socha...' - NEVER Devanagari) with English technical terms. Dense, punchy, no fluff. Absolutely MUST open with a hard-hitting hook in the first sentence. End with a thought-provoking question or quote. Do NOT repeat the title verbatim.",
  "image_prompts": ["5 SHORT vertical photorealistic prompts: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>"],
   "image_queries": ["5 SHORT NASA-image-library search phrases matching the prompts, each 2-4 words, e.g. 'voyager spacecraft', 'webb deep field'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic vertical photorealistic thumbnail prompt, no text, no watermark"
@@ -427,6 +427,24 @@ Angle: {angle}"""
         log("JSON parse failed, retrying once:", e)
         raw = call_llm(sys_prompt, user_prompt + "\n\nReply ONLY with valid JSON.", max_tokens=3000)
         ep = extract_json(raw)
+
+    def _has_non_latin_script(text):
+        for ch in text:
+            o = ord(ch)
+            if 0x0900 <= o <= 0x097F or 0x0600 <= o <= 0x06FF or 0x0750 <= o <= 0x077F:
+                return True
+        return False
+
+    if _has_non_latin_script(ep.get("narration", "")):
+        log("narration contains non-Latin script - rewriting in Latin script")
+        raw2 = call_llm(sys_prompt,
+                        f"Your previous narration contained Devanagari or Urdu characters. Rewrite the SAME short (~110-130 words) STRICTLY in ROMAN/Latin script transliterated Hindi-Urdu (e.g., 'Dosto, sunte ho?') - ZERO Devanagari or Urdu characters. Topic: {topic}. Angle: {angle}. Keep it punchy with a hard-hitting hook. Reply ONLY with the narration as plain text.",
+                        max_tokens=1500)
+        if not _has_non_latin_script(raw2):
+            ep["narration"] = raw2.strip()
+            log("narration rewritten in Latin script")
+        else:
+            log("WARNING: rewrite still has non-Latin chars - TTS may fail")
 
     ep["title"] = scrub_ai_text(ep.get("title", "")) or "Cosmic mystery — watch this"
     ep["description"] = scrub_ai_text(ep.get("description", ""))
@@ -451,7 +469,7 @@ Angle: {angle}"""
     (WORK / "narration.txt").write_text(narration, encoding="utf-8")
 
     mp3, srt = WORK / "short.mp3", WORK / "short.srt"
-    voices = [VOICE] + [v for v in ("hi-IN-SwaraNeural", "hi-IN-MadhurNeural", "ur-PK-UzmaNeural") if v != VOICE]
+    voices = [VOICE] + [v for v in ("en-IN-NeerjaNeural", "en-IN-PrabhatNeural") if v != VOICE]
     tts_ok = False
     last_err = None
     for voice in voices:
