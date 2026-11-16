@@ -34,16 +34,16 @@ FALLBACK_MODELS    = [m for m in [
     "google/gemma-4-26b-a4b-it:free",
 ] ]
 VOICE              = os.environ.get("TTS_VOICE", "hi-IN-SwaraNeural")   # Hindi female voice
-TTS_RATE           = os.environ.get("TTS_RATE", "-5%")
+TTS_RATE           = os.environ.get("TTS_RATE", "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")  # safe default; set public when confident
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
 DRY_RUN            = os.environ.get("DRY_RUN", "0") == "1"
 EPISODE_OVERRIDE   = os.environ.get("EPISODE_INDEX", "").strip()  # force a specific episode id
 
 TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "12"))   # minutes; <=14 keeps videos under the 15-minute upload limit for unverified channels. Raise via vars after phone verification (youtube.com/verify).
-# Hindi TTS speaks ~0.55 s/word at rate=-5% -> ~109 words/minute. Use ~110 words/min so the final video
-# matches TARGET_MINUTES even with LLM overshoot (an unverified channel cannot upload videos >15:00).
-WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 110)))
+# Hindi TTS at rate=+0% speaks ~0.60 s/word (~100 words/minute). Use ~100 words/min so the final
+# video matches TARGET_MINUTES even with LLM overshoot (unverified channels cannot upload videos >15:00).
+WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 100)))
 LONG_MODE          = TARGET_MINUTES >= 15
 W, H, FPS = 1024, 576, 25
 _n_img_env = os.environ.get("N_IMAGES", "").strip()
