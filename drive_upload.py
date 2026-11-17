@@ -10,7 +10,7 @@ from googleapiclient.http import MediaFileUpload
 ROOT = Path(__file__).resolve().parent
 BACKUP_DIR = Path(r"C:\Users\Park-Edge\Documents\Default Project\github-backup")
 FOLDER_NAME = "GitHub_Backup"
-FILES = sorted(BACKUP_DIR.glob("*"))
+FILES = sorted(p for p in BACKUP_DIR.glob("*") if p.is_file())
 TOKEN_PATH = Path(os.environ["APPDATA"]) / "gcloud" / "application_default_credentials.json"
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
