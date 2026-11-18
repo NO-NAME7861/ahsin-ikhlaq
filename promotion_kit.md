@@ -49,7 +49,7 @@ Post: "Most videos tell you WHAT happened in space. We ask WHY it matters — fi
 "Apna ek cosmic question comment me drop karo — sabse acche waale agle episode mein shamil honge. Subscribe karke notifications on kar do — universe ke saath travel karte raho."
 
 ## User-side action items
-1. Phone verification: https://www.youtube.com/verify with ahsininfo [at] gmail.com — unlocks 15-min+ videos and custom thumbnails.
+1. Phone verification: https://www.youtube.com/verify with your channel owner email — unlocks 15-min+ videos and custom thumbnails.
 2. Post quizzes daily from quizzes/quiz-*.md (Studio → Community tab).
 3. Pin the template above on each video — comments fuel the algorithm.
 4. In Studio → Customization → About: add one Telegram link so viewers can find you.
