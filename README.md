@@ -1,173 +1,37 @@
 # Ahsin Akhlaq — Universe & Philosophy YouTube Automation
 
-Naya channel: **Universe Explorer + Philosophy** — Romanized Hindi-Urdu (Latin script) + English deep-dives (Roman Hinglish narration with English technical terms).
+> ⚠ **Proprietary automation — all rights reserved** (see [LICENSE](LICENSE)).
+> Do not copy, redistribute, fork, or adapt this code into your own uploads without the channel owner's
+> explicit written permission. The owner's Google credentials and API keys are never committed.
+
+**Channel:** https://www.youtube.com/@ahsin-ikhlaq — deep-dives on the cosmos and the human condition:
+cosmology, space exploration, quantum mechanics, philosophy, ethics, and what the universe says about us.
+
+## What this project is
+
+A fully automated YouTube pipeline:
 
 ```
-LLM (OpenRouter free) → photorealistic images (Pollinations, free)
-→ edge-tts en-IN-NeerjaExpressiveNeural voice (free) + NASA image library (real photos) → subtitles + Ken Burns video (ffmpeg)
-→ YouTube upload (YouTube Data API v3) → Google Drive backup
+LLM (OpenRouter) -> image generation (NASA image library with artwork fallback)
+  -> edge-tts voice -> Ken Burns video with subtitles (ffmpeg)
+  -> YouTube upload (YouTube Data API v3) -> playlist + Drive backup
 ```
 
-Cost: **$0/month** (GitHub Actions free tier). Koi video editing nahi — fully automatic. 3 videos/day + 3 Shorts/day (all within YouTube's 10,000 unit/day API quota; ~6 uploads × 1,600 = 9,600).
+Runs on GitHub Actions: **3 long-form videos/day, 3 Shorts/day, daily quizzes.**
+All content is factual, sourced (NASA, ESA, peer-reviewed journals), and written in Hindi with
+English technical terms. No AI boilerplate, no fake facts.
 
-> ⚠️ **Yeh (redacted)/(redacted) wale Google account se ALAG hai.** Naye channel ke liye ALAG Google account use hoga, aur `token.json` / `client_secret.json` is folder mein kabhi copy KARNA hi NAHI.
+See `episodes.csv` for the 30-episode arc and `promotion_kit.md` for the channel's outreach plan.
 
----
+## Public here
 
-## Pehle ek baar yeh setup karein (~20 minutes)
+- The automation pipeline source code
+- The episode roadmap (`episodes.csv`)
+- The privacy policy and terms of service (`PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`)
 
-### STEP 0 — Alag Google account ready karein
+## Not included (and never included)
 
-1. Naya Gmail account (ya jo account naye channel ke liye dedicated hai) — sign in rakhein
-2. [youtube.com](https://www.youtube.com) → profile icon → **Create a channel** → naam: **Ahsin Akhlaq**
-3. Channel ban gaya hai ✅ — **https://www.youtube.com/@ahsin-ikhlaq** (naam: Ahsin-Akhlaq).
+- No Google credentials, client secrets, or refresh tokens — those live in GitHub Secrets only
+- No private contact information
 
-### STEP 1 — Google Cloud project (NAYE account par)
-
-1. [console.cloud.google.com](https://console.cloud.google.com) — **naye** Google account se sign in karein (browser ka correct profile select karein!)
-2. Top bar → **Select project** → **New Project** → naam: `UniverseExplorer` → Create
-
-### STEP 2 — APIs enable karein
-
-1. **APIs & Services** → **Library**
-2. **YouTube Data API v3** → Enable
-3. **Google Drive API** → Enable
-
-### STEP 3 — OAuth consent screen
-
-1. **OAuth consent screen** → User Type: **External** → Create
-2. Fill karein:
-   - App name: `UniverseExplorer`
-   - User support email: naye account ka email
-   - Developer contact: aapka email
-3. **Scopes** → Add: `youtube.upload`, `youtube`, `drive.file` → Save & Continue
-4. **Test users** → apna naya Gmail add karein → Save
-5. ⚠️ **Publish app** (ZAROORI): wapas consent screen page → **"Publish app"** → Confirm.
-   (Testing mode mein refresh token **har 7 din** baad expire ho jayega!)
-
-### STEP 4 — OAuth Client ID (Desktop)
-
-1. **Credentials** → **+ Create Credentials** → **OAuth client ID**
-2. Application type: **Desktop app** → Name: `universe-uploader` → Create
-3. **Download JSON** → rename to **`client_secret.json`**
-4. Is folder mein rakh dein: `universe-explorer\client_secret.json`
-
-### STEP 5 — Local token (ek baar, browser mein allow)
-
-**CRITICAL:** Browser ka wo profile use karein jisme **NAYA Google account** signed in hai (ya Incognito window khol kar naye account se login karein) — warna token purane (redacted) account/channel ke liye ban jayega!
-
-```powershell
-cd "C:\Users\Park-Edge\Documents\Default Project\universe-explorer"
-python -m pip install -r requirements.txt
-python get_token.py
-```
-Browser khulega → **naya** Google account select → Allow → `token.json` ban jayega.
-
-### STEP 6 — GitHub repo + secrets
-
-Repo already banaya jaa chuka hai: **NO-NAME7861/universe-explorer** (private) — wahi GitHub account jaisa purana project.
-
-```powershell
-cd "C:\Users\Park-Edge\Documents\Default Project\universe-explorer"
-git remote add origin https://github.com/<YOUR-GITHUB>/universe-explorer.git
-git push -u origin main
-
-# 1) OpenRouter key — wahi purani key reuse ho sakti hai (OpenRouter account se linked hai, Google account se nahi)
-gh secret set OPENROUTER_API_KEY
-
-# 2) token.json ka base64 — NEW account wala token!
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\token.json")) | gh secret set YOUTUBE_TOKEN_JSON
-
-# 3) (Optional) voice badalni ho to:
-gh variable set TTS_VOICE --body "en-IN-NeerjaExpressiveNeural"
-```
-
-### STEP 7 — Pehla run (PRIVATE!)
-
-1. GitHub repo → **Actions** → **Daily Universe Explorer Upload** → **Run workflow**
-2. `privacy: private` चुन के Run
-3. ~20–60 min baad video Studio mein aayega — watch flow: `work/episode.json` mein generated title/description/narration dikhega (artifact `episode-work` download karke check karein)
-4. Sab theek ho to public run karein
-
-Iske baad roz 3 times (10 AM / 4 PM / 11 PM PKT) khud hota rahega.
-
----
-
-## 50-minute long-form videos
-
-`TARGET_MINUTES` se video length control hoti hai. **Abhi default 12** (unverified channel ke liye safe limit — YouTube 15+ minute accept nahi karta).
-
-⚠️ **Jab tak channel phone verification nahi ho ([youtube.com/verify](https://www.youtube.com/verify)) — YouTube >15 min unverified channels ke videos ko REJECT karta hai**, videos "Deleted" dikhti hain. Verification hone ke baad:
-```powershell
-gh variable set TARGET_MINUTES --body "22"
-```
-
-Ya sirf ek specific run ke liye: Actions → Run workflow → **target_minutes: 50** likh do.
-
-**Kaam kaise karta hai**: free models ek response mein 7000+ words nahi de sakte, isliye long mode pehle metadata + 8-scene outline banata hai, phir narration **3 parts (~2400 words each)** mein generate karke stitch karta hai (Romanized Hindi-Urdu, same Hinglish style). `N_IMAGES` default 16 → 20 ho jata hai (env se override kar sakte hain). CI timeout 300 min set hai.
-
-**Practical notes**:
-- Render time ~1.5–3 ghante (GitHub Actions pe); file size ~250–400MB — YouTube resumable upload handle karega
-- 50-min videos watch-hours (monetization) fast badhate hain, lekin AI narration pe audience retention kaafi mushkil hota hai — experts bhi 50 mint hold nahi karte. Titles/hooks aur better banao (cf. `make_episodes_100` style hooks) – agar quality gir rahi ho to 22-min default pe wapas a jao: `gh variable set TARGET_MINUTES --body "22"`
-- Cost: poori 50-min pipeline abhi bhi **$0** hai
-
-## Channels ka separation (IMPORTANT)
-
-| Cheez | (redacted) (purana) | Ahsin Akhlaq (naya) |
-|---|---|---|
-| Google account | Purana | **Alag naya** |
-| Folder | `youtube-automation` | `universe-explorer` |
-| Repo | `NO-NAME7861/youtube-automation` | naya repo |
-| Token | purana `token.json` | **naya token (Step 5)** |
-| Playlist | Chinese/Japanese Recaps | `Universe & Philosophy Deep Dives` |
-
-`client_secret.json` / `token.json` kabhi git mein commit na ho — `.gitignore` do tailed hota hai uske liye check karein.
-
----
-
-## Content quality & honesty guidelines
-
-1. **Fact-check**: LLM kabhi bhi wrong numbers/dates de sakta hai. Description mein source line hai, lekin pehli few uploads ko manually dekhen — koi glaring error ho to `episodes.csv` ka brief refine karein. Galat facts = channel ki credibility khatam.
-2. **AI disclosure**: Description already includes *"Yeh video AI-generated visuals aur AI narration se banayi gayi hai"*. YouTube Studio mein pehli upload ke baad **"altered or synthetic content" toggle** manually check/on karein.
-3. **"Realistic" images ka matlab**: Pollinations/Flux photorealistic AI renders banata hai — yeh **actual NASA/JWST photos nahi** hote. Description mein yahi likha hai; kabhi bhi claim na karein ki yeh real mission photos hain. (Optional upgrade: NASA images public domain hain — future mein `image_prompts` ki jagah real NASA URLs mixing pipeline mein add kar sakte hain, lekin poori automation complexity badh jayegi.)
-4. **Monetization**: Naye channel ko 1,000 subs + 4,000 watch-hours (ya Shorts route) chahiye. AI content ke saath monetization tougher hai — original voice commentary, real insight aur consistency se hi chalega. Koi guaranteed growth nahi — patience.
-5. **Uniqueness**: Har brief mein `moral` field philosophical insight hai — yahi woh cheez hai jo generic AI universe channels se different banata hai. Isse weak mat karna.
-
-## Customize
-
-| Cheez | Kaise |
-|---|---|
-| Voice | | Voice | `vars.TTS_VOICE`: `en-IN-NeerjaExpressiveNeural` (Indian expressive female), `en-IN-NeerjaNeural`, `en-IN-PrabhatNeural` |
-| Video length | `vars.TARGET_MINUTES` (22 default, >=15 uses chunked 3-part LLM generation) |
-| Shorts | automatic 3/day (9 AM / 1 PM / 6 PM PKT) via `.github/workflows/shorts.yml` |
-| Quizzes | automatic daily generation; file in `quizzes/` — copy into Studio → Community → Poll (manual) |
-| Upload time | `.github/workflows/daily.yml` → cron `30 18 * * *` (UTC) |
-| Frequency | `.github/workflows/daily.yml` → cron `0 5,11,18 * * *` (UTC) = 10 AM / 4 PM / 11 PM PKT |
-| Episodes | `episodes.csv` — 30 briefs hain; expert-level topics add karein |
-| Category | `generate_episode.py` → `categoryId: "27"` (Education) — 24 Entertainment bhi kar sakte hain |
-| Images resolution | `W,H` (1024x576), `N_IMAGES` (16) |
-
-## Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| `token.json missing` | Step 5 dobara — **naye account ke Incognito profile** mein |
-| `invalid_grant` | App Testing mode mein hai → Publish app → token dobara |
-| Missing/hidden subtitle fonts | Workflow already `fonts-noto-core` install karti hai; local PC pe Noto Sans present hota hai |
-| LLM factual error | `episodes.csv` brief mein exact fact likhein (numbers/missions) |
-| LLM returns no JSON | `OPENROUTER_MODEL` variable set karein (e.g. `qwen/qwen-2.5-72b-instruct:free`) |
-| Upload forbidden | Naye account ka channel verified/active hai? APIs enabled? `youtube.upload` scope consent screen mein? |
-| Wrong channel pe upload ho gaya | Token purane account ka bana tha — Step 5 dobara, Incognito mein |
-
-## Files
-
-- `generate_episode.py` — main pipeline (long-form Romanized Hindi-Urdu (Latin script), NASA library images (Pollinations + local starfield fallback), en-IN Neerja expressive voice)
-- `generate_short.py` — vertical Shorts pipeline (1080x1920)
-- `update_state.py` — atomic episode state persistence (fetch-recompute-retry)
-- `generate_quiz.py` — 2 daily cosmos/philosophy quizzes, writes `quizzes/quiz-YYYY-MM-DD.md`
-- `episodes.csv` — 30 expert-level Universe + Philosophy briefs
-- `state/episodes.json` / `state/shorts.json` — episode/shorts trackers
-- `get_token.py` / `get_token_drive.py` — OAuth helpers
-- `.github/workflows/daily.yml` — 3 episodes/day
-- `.github/workflows/shorts.yml` — 3 Shorts/day
-- `.github/workflows/quiz.yml` — daily quiz batch
+Questions about the channel: via the [channel's About page](https://www.youtube.com/@ahsin-ikhlaq/about)

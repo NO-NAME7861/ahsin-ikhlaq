@@ -24,4 +24,5 @@ This app is not directed at children and does not knowingly collect personal dat
 This policy may be updated over time. Changes are reflected in the commit history of this repository.
 
 ## Contact
-Questions: ahsincyber [at] gmail.com
+Questions: via the [channel About page](https://www.youtube.com/@ahsin-ikhlaq/about) or the comments on any video.
+(We do not maintain a public support inbox.)

@@ -20,4 +20,5 @@ The software is provided "as is", without warranty of any kind. The operator is 
 These terms may be updated as needed; the commit history of the source repository reflects changes.
 
 ## 6. Contact
-Questions: ahsincyber [at] gmail.com
+Questions: via the [channel About page](https://www.youtube.com/@ahsin-ikhlaq/about) or the comments on any video.
+(We do not maintain a public support inbox.)

@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 .env
 work_shorts/
+first_subscriber_watch.log
+*.log
+
