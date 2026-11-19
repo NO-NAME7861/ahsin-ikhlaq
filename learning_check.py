@@ -75,8 +75,8 @@ def main():
     LEARN.parent.mkdir(parents=True, exist_ok=True)
     LEARN.write_text(json.dumps(new_learning, indent=2, ensure_ascii=False) + "\n",
                       encoding="utf-8")
-    log(f"wrote {LEARN}")
-    log(f"top: {[f'{v[\"views\"]} ({k})' for k,v in top]}")
+    log("wrote state/learning.json")
+    log(f"top performers: " + ", ".join(f"{k}={v['views']}" for k, v in top))
 
 if __name__ == "__main__":
     main()
