@@ -1,0 +1,33 @@
+name: Weekly Security Check
+
+# Runs Sundays at 06:00 PKT (= 01:00 UTC). Failure emails repo owner.
+
+on:
+  schedule:
+    - cron: "0 1 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install google-api-python-client google-auth
+
+      - name: Decode YouTube token
+        env:
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+        run: echo "$YOUTUBE_TOKEN_JSON" | base64 -d > token.json
+
+      - name: Run security audit
+        run: python security_check.py

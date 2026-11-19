@@ -201,6 +201,16 @@ def call_llm(row):
         "numbers and dates. If a fact is uncertain or debated, say so honestly. "
         "Use SIMPLE HINDI that a 12-year-old can understand. Short sentences. Avoid Sanskritized heavy words. "
         "Natural spoken rhythm: second-person 'aap', rhetorical questions, breath-catching pauses. "
+        "EDITING PLAYBOOK (modeled on popular science channels): "
+        "1) First line = HOOK question, max 20 words, curiosity gap. "
+        "2) Average sentence under 15 words; no sentence over 30 words. "
+        "3) New scene every ~50 seconds; visual change expected. "
+        "4) Ask a small question every 2-3 sentences to keep brain engaged. "
+        "5) Facts cited inline (e.g. 'NASA ne 2023 mein JWST se...' style), never vague 'experts say'. "
+        "6) End with one philosophical line, then silence, then sources line. "
+        "7) Title = curiosity gap, max 65 chars, no punctuation except ':' and '?'. "
+        "8) NEVER use phrases like 'AI-generated', 'AI narration', 'artificial intelligence'."
+
         "Never use phrases like 'AI-generated', 'AI content', 'AI narration', or 'artificial intelligence' in the title or description. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
