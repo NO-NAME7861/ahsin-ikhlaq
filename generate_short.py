@@ -65,6 +65,14 @@ TOPICS = [
     "Mysteries of the night sky", "Why do we exist at all", "The fine-tuning argument",
     "What lies beyond the observable universe", "The edge of the universe", "Cosmic dawn",
     "The first stars", "The reionization epoch", "Cosmic dawn light", "The universe's first light",
+    # psychology (the channel's third pillar: universe + philosophy + mind)
+    "Cognitive dissonance explained", "Why your brain rewrites your memories",
+    "The bystander effect", "Why time feels faster as you age", "The Dunning-Kruger effect",
+    "Learned helplessness", "The spotlight effect", "Why we procrastinate",
+    "The science of habit loops", "The Zeigarnik effect", "Cognitive biases that fool you daily",
+    "The mere exposure effect", "Why multitasking fails", "The peak-end rule",
+    "Loss aversion explained", "The placebo effect", "Why you can't stop scrolling",
+    "Attachment styles explained", "The misinformation effect", "Why memory is a reconstruction",
 ]
 
 ANGLES = [
