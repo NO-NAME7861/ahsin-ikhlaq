@@ -300,14 +300,14 @@ def _llm_with_fallback(sys_prompt, user_prompt, max_tokens, label, expect_json=T
 
 def call_llm_long(row, sys_prompt, _unused):
     """50-minute episodes: meta + 3 narration parts stitched (free models cap output)."""
-    meta_prompt = f"""Write ONLY the metadata for one long-form (50-minute) deep-dive episode. Reply with valid JSON:
+    meta_prompt = f"""Write ONLY the metadata for one long-form ({TARGET_MINUTES}-minute) deep-dive episode. Reply with valid JSON:
 {{
  "title": "YouTube title, max 70 chars, expert curiosity-gap ENGLISH ONLY",
  "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
  "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence â€” the episode's central philosophical insight",
  "image_prompts": ["{N_IMAGES} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>. Space imagery throughout."],
-  "image_queries": ["{n_img_prompts} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
+  "image_queries": ["{N_IMAGES} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
   "thumbnail_query": "2-4 word NASA search phrase for the thumbnail, e.g. 'earth from space'",
  "outline": ["8 scene summaries with the key scientific facts, numbers and philosophers to cover, in order â€” this is the plan for the 3 narrative parts"]
