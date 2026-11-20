@@ -18,7 +18,28 @@ on:
         default: ""
         type: string
       target_minutes:
-        description: "Video length in minutes (12 = safe for unverified channels, since videos >15:00 are rejected)"
+        description: "Video length in minutes (12 = default; 30/50 now allowed after channel verification)"
+        required: false
+        default: ""
+        type: string
+      narration_lang:
+        description: "Narration language: hi = Romanized Hindi-Urdu, en = English"
+        required: false
+        default: "hi"
+        type: choice
+        options: ["hi", "en"]
+      episode_topic:
+        description: "One-off topic override (leave empty to use episodes.csv rotation)"
+        required: false
+        default: ""
+        type: string
+      episode_moral:
+        description: "One-off central insight for the topic override (optional)"
+        required: false
+        default: ""
+        type: string
+      max_minutes:
+        description: "Safety cap on narration length in minutes (default 14.2; use 55 for long videos)"
         required: false
         default: ""
         type: string
@@ -33,7 +54,7 @@ concurrency:
 jobs:
   generate-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 350
 
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +85,10 @@ jobs:
           EPISODES_CSV: ${{ vars.EPISODES_CSV || 'episodes.csv' }}
           EPISODE_INDEX: ${{ inputs.episode_index || '' }}
           TARGET_MINUTES: ${{ inputs.target_minutes || vars.TARGET_MINUTES || '12' }}
+          NARRATION_LANG: ${{ inputs.narration_lang || 'hi' }}
+          EPISODE_TOPIC: ${{ inputs.episode_topic || '' }}
+          EPISODE_MORAL: ${{ inputs.episode_moral || '' }}
+          MAX_MINUTES: ${{ inputs.max_minutes || '14.2' }}
           N_IMAGES: ${{ vars.N_IMAGES || '' }}
           UPLOAD: "1"
         run: python generate_episode.py

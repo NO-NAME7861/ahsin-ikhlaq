@@ -12,7 +12,7 @@ import os, sys, json, csv, time, random, base64, asyncio, subprocess
 import re
 import urllib.request, urllib.parse
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "work"
@@ -34,26 +34,60 @@ FALLBACK_MODELS    = [m for m in [
     "google/gemma-4-26b-a4b-it:free",
 ] ]
 VOICE              = os.environ.get("TTS_VOICE", "en-IN-NeerjaExpressiveNeural")   # Indian expressive female voice (English/Hinglish/Roman Urdu)
-TTS_RATE           = os.environ.get("TTS_RATE", "+0%")
+NARRATION_LANG     = os.environ.get("NARRATION_LANG", "hi").strip().lower()
+ENGLISH_MODE       = NARRATION_LANG.startswith("en")
+# +22% is the measured setting that makes this voice speak at ~200 words/minute in English.
+TTS_RATE           = os.environ.get("TTS_RATE", "+22%" if ENGLISH_MODE else "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")  # safe default; set public when confident
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
 DRY_RUN            = os.environ.get("DRY_RUN", "0") == "1"
 EPISODE_OVERRIDE   = os.environ.get("EPISODE_INDEX", "").strip()  # force a specific episode id
 
 TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "12"))   # minutes; <=14 keeps videos under the 15-minute upload limit for unverified channels. Raise via vars after phone verification (youtube.com/verify).
-# Hindi TTS at rate=+0% speaks ~0.60 s/word (~100 words/minute). Use ~100 words/min so the final
-# video matches TARGET_MINUTES even with LLM overshoot (unverified channels cannot upload videos >15:00).
-WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * 100)))
+# Speech-rate targets for en-IN-NeerjaExpressiveNeural:
+#   English at rate=+22%  -> ~200 words/min (user's chosen pace)
+#   Romanized Hindi-Urdu  -> ~100 words/min at rate=+0%
+# Use those rates so the final video matches TARGET_MINUTES even with LLM overshoot.
+WORDS_PER_MIN      = 200 if ENGLISH_MODE else 100
+WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * WORDS_PER_MIN)))
 LONG_MODE          = TARGET_MINUTES >= 15
+MAX_MINUTES        = float(os.environ.get("MAX_MINUTES", "14.2"))  # raise after channel verification
+EPISODE_TOPIC      = os.environ.get("EPISODE_TOPIC", "").strip()   # one-off topic override (no csv edit)
+EPISODE_MORAL      = os.environ.get("EPISODE_MORAL", "").strip()
 W, H, FPS = 1024, 576, 25
 _n_img_env = os.environ.get("N_IMAGES", "").strip()
 N_IMAGES           = int(_n_img_env) if _n_img_env else (20 if LONG_MODE else 16)
 CHANNEL_NAME = "Ahsin Akhlaq"
 
+# Narration language switch: default is the channel's Romanized Hindi-Urdu,
+# "en" produces a fully English episode (same voice, same pipeline).
+LANG_STYLE = (
+    "clear, vivid, neutral ENGLISH (simple words a 12-year-old understands, short sentences, "
+    "no Hindi or Urdu phrases)"
+    if ENGLISH_MODE else
+    "natural, warm ROMANIZED Hindi-Urdu (Latin script, written exactly the way people text in "
+    "India/Pakistan, e.g. 'Namaste doston, aaj sochenge...') with English technical terms "
+    "embedded naturally (e.g., 'black hole', 'entropy', 'dark matter')"
+)
+SCRIPT_RULE = ("English only, Latin script." if ENGLISH_MODE
+               else "NEVER Devanagari or Urdu script - Latin letters only")
+
 # ---------------------------------------------------------------- helpers
 
 def log(*a):
     print(f"[{datetime.now():%H:%M:%S}]", *a, flush=True)
+
+
+def _seconds_until_upload_reset():
+    """Seconds until YouTube's daily upload counter resets (midnight Pacific)."""
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Los_Angeles")
+    except Exception:
+        tz = timezone(timedelta(hours=-8))  # PST fallback
+    now = datetime.now(tz)
+    nxt = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
+    return max(60.0, (nxt - now).total_seconds())
 
 AI_PHRASES = [
     r"AI[-]?generated", r"AI generated", r"AI[-]?narration", r"AI narration",
@@ -70,6 +104,12 @@ def scrub_ai_text(text):
     return out or text
 
 def load_episode():
+    if EPISODE_TOPIC:
+        return {
+            "id": EPISODE_OVERRIDE or "special",
+            "topic": EPISODE_TOPIC,
+            "moral": EPISODE_MORAL or "Wonder is the beginning of wisdom",
+        }
     rows = list(csv.DictReader(open(EPISODES_CSV, encoding="utf-8")))
     assert rows, "episodes.csv empty"
     if EPISODE_OVERRIDE:
@@ -172,7 +212,7 @@ def _ensure_narration_length(row, sys_prompt, ep):
     if wc >= floor:
         return ep
     log(f"narration too short ({wc} words < {floor}) - requesting an expanded version")
-    expand_prompt = f"""Below is a narration draft ({wc} words) for this episode. REWRITE and EXPAND it to a MINIMUM of {WORDS_TARGET} words in natural Romanized Hindi-Urdu (Latin script, transliterated) with English technical terms. Keep every fact accurate (no claims beyond the draft's scope), keep the 6-10 scene paragraph structure, keep the warm second-person 'aap' voice. Reply ONLY with the expanded narration as plain text - no JSON, no markdown, no commentary.
+    expand_prompt = f"""Below is a narration draft ({wc} words) for this episode. REWRITE and EXPAND it to a MINIMUM of {WORDS_TARGET} words in {LANG_STYLE}. {SCRIPT_RULE} Keep every fact accurate (no claims beyond the draft's scope), keep the 6-10 scene paragraph structure, keep the warm direct-address voice. Reply ONLY with the expanded narration as plain text - no JSON, no markdown, no commentary.
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
@@ -194,19 +234,19 @@ DRAFT NARRATION:
 def call_llm(row):
     sys_prompt = (
         f"You are a world-class science communicator and philosopher writing for the YouTube channel '{CHANNEL_NAME}', "
-        "a deep-dive channel that merges cutting-edge universe exploration and space science with profound philosophy. "
-        "You combine the rigor of a cosmology textbook, the storytelling of Carl Sagan, and the depth of a philosophy "
-        "seminar. You write for a Hindi-speaking Indian and Pakistani audience in natural, warm ROMANIZED Hindi-Urdu (Latin script, written exactly the way people text in India/Pakistan, e.g. 'Namaste doston, aaj sochenge...') with English technical terms embedded naturally (e.g., 'black hole', 'entropy', 'dark matter', 'fine-tuning'). You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
-        "Event Horizon Telescope, New Horizons), real scientists (Einstein, Sagan, Hawking, Noether), real theories, real "
-        "numbers and dates. If a fact is uncertain or debated, say so honestly. "
-        "Use SIMPLE HINDI that a 12-year-old can understand. Short sentences. Avoid Sanskritized heavy words. "
-        "Natural spoken rhythm: second-person 'aap', rhetorical questions, breath-catching pauses. "
+        "a deep-dive channel that merges cutting-edge universe exploration, human psychology and profound philosophy. "
+        "You combine the rigor of a textbook, the storytelling of Carl Sagan, and the depth of a philosophy "
+        f"seminar. You write in {LANG_STYLE}. You NEVER fabricate facts: use real missions (Voyager, JWST, LIGO, "
+        "Event Horizon Telescope, New Horizons), real scientists and psychologists (Einstein, Sagan, Hawking, Noether, "
+        "Festinger, Loftus, Kahneman), real theories, real numbers and dates. If a fact is uncertain or debated, say so honestly. "
+        "Use SIMPLE language that a 12-year-old can understand. Short sentences. "
+        "Natural spoken rhythm: direct address, rhetorical questions, breath-catching pauses. "
         "EDITING PLAYBOOK (modeled on popular science channels): "
         "1) First line = HOOK question, max 20 words, curiosity gap. "
         "2) Average sentence under 15 words; no sentence over 30 words. "
         "3) New scene every ~50 seconds; visual change expected. "
         "4) Ask a small question every 2-3 sentences to keep brain engaged. "
-        "5) Facts cited inline (e.g. 'NASA ne 2023 mein JWST se...' style), never vague 'experts say'. "
+        "5) Facts cited inline (name + year + source), never vague 'experts say'. "
         "6) End with one philosophical line, then silence, then sources line. "
         "7) Title = curiosity gap, max 65 chars, no punctuation except ':' and '?'. "
         "8) NEVER use phrases like 'AI-generated', 'AI narration', 'artificial intelligence'."
@@ -221,7 +261,7 @@ def call_llm(row):
  "description": "2-3 sentence hook + 1 line central insight + line: 'Sources: NASA, ESA, peer-reviewed journals.' + subscribe CTA, max 1000 chars. ENGLISH ONLY. Do NOT mention AI, artificial intelligence, AI-generated visuals, AI narration, or synthetic content.",
  "tags": ["max 15 tags, ENGLISH ONLY"],
  "moral": "one sentence â€” the episode's central philosophical insight",
- "narration": "EXACTLY {WORDS_TARGET} words (plus-minus 5%) - hard cap {WORDS_TARGET + 150} words; never exceed the cap. continuous narration in natural, warm ROMANIZED Hindi-Urdu (Latin script, transliterated spelling, e.g. 'Dekhte hain...' - NEVER Devanagari or Urdu script) with English technical terms (black hole, redshift, entropy). Simple words, short sentences, warm second-person address: short sentences, you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads cosmology papers for a living.",
+ "narration": "EXACTLY {WORDS_TARGET} words (plus-minus 5%) - hard cap {WORDS_TARGET + 150} words; never exceed the cap. continuous narration in {LANG_STYLE}. {SCRIPT_RULE} Simple words, short sentences, direct address: you-voice, rhetorical questions, breath-catching pauses. Split into 6-10 scenes (separated by paragraph breaks) so viewers never feel a dull moment. Each scene: a precise scientific fact/mechanism -> its deeper meaning -> a philosophical question it raises. Include REAL numbers, names, dates. MUST end with the central philosophical insight. Speak like a brilliant, warm storyteller who reads research papers for a living.",
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
   "image_queries": ["{n_img_prompts} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
@@ -281,19 +321,19 @@ Central insight: {row['moral']}"""
 
     parts = []
     for part_no in (1, 2, 3):
-        part_prompt = f"""You are writing PART {part_no} of 3 narration parts for ONE 50-minute deep-dive episode
-(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (Â±10%), natural Romanized Hindi-Urdu (Latin script), natural spoken rhythm, paragraph breaks every few sentences).
+        part_prompt = f"""You are writing PART {part_no} of 3 narration parts for ONE long-form ({TARGET_MINUTES}-minute) deep-dive episode
+(target total {WORDS_TARGET} words; this part MUST be ~{WORDS_TARGET // 3} words (plus/minus 10%), written in {LANG_STYLE}, {SCRIPT_RULE} Natural spoken rhythm, paragraph breaks every few sentences.
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
 
-FULL OUTLINE (do NOT repeat what other parts cover â€” write ONLY your assigned scenes):
+FULL OUTLINE (do NOT repeat what other parts cover - write ONLY your assigned scenes):
 {outline_txt}
 
 PART {part_no} ASSIGNMENT:
 {'Open the episode with a powerful hook. Cover outline scenes 1-3. End part 1 on a cliffhanger.' if part_no == 1 else ('Continue from part 1. Cover outline scenes 4-6. Keep tension rising. End part 2 mid-crescendo.' if part_no == 2 else 'Now land the plane. Cover the remaining outline scenes. End with the central philosophical insight, delivered with awe.')}
 
-Reply with plain text ONLY (no JSON, no markdown) - just the narration in natural Romanized Hindi-Urdu (Latin script), ready for voiceover."""
+Reply with plain text ONLY (no JSON, no markdown) - just the narration, ready for voiceover."""
         part = _llm_with_fallback(sys_prompt, part_prompt, 6000, f"narration-part-{part_no}", expect_json=False)
         parts.append(part.strip())
 
@@ -548,7 +588,7 @@ def youtube_upload(ep, mp4, thumbnail):
             "description": ep["description"],
             "tags": ep.get("tags", [])[:15],
             "categoryId": "27",  # Education
-            "defaultLanguage": "hi",
+            "defaultLanguage": "en" if ENGLISH_MODE else "hi",
         },
         "status": {
             "privacyStatus": PRIVACY_STATUS,
@@ -558,12 +598,29 @@ def youtube_upload(ep, mp4, thumbnail):
     media = MediaFileUpload(str(mp4), chunksize=16 * 1024 * 1024, resumable=True,
                             mimetype="video/mp4")
     log("uploading to YouTube ...")
-    req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+
+    def _do_upload():
+        req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+        r = None
+        while r is None:
+            status, r = req.next_chunk()
+            if status:
+                log(f"upload {int(status.progress() * 100)}%")
+        return r
+
     resp = None
-    while resp is None:
-        status, resp = req.next_chunk()
-        if status:
-            log(f"upload {int(status.progress() * 100)}%")
+    for attempt in range(2):
+        try:
+            resp = _do_upload()
+            break
+        except Exception as e:
+            if "uploadLimitExceeded" in str(e) and attempt == 0:
+                wait = _seconds_until_upload_reset()
+                log(f"YouTube daily upload cap reached; sleeping {wait / 60:.0f} min "
+                    "until the midnight-Pacific reset, then retrying once")
+                time.sleep(wait)
+                continue
+            raise
     vid = resp["id"]
     log(f"uploaded: https://youtu.be/{vid}")
 
@@ -689,9 +746,9 @@ def main():
     run_tts(WORK / "narration.txt", mp3, srt)
     dur = media_duration(mp3)
     log(f"narration audio duration: {dur:.1f}s ({dur / 60:.1f} min)")
-    if dur > 850:  # 14m10s — leaves margin under the 15:00 limit for unverified channels
-        sys.exit(f"narration too long for an unverified channel ({dur / 60:.1f} min). "
-                 "Aborting before upload. Lower TARGET_MINUTES/WORDS_TARGET or verify the channel (youtube.com/verify).")
+    if dur > MAX_MINUTES * 60:
+        sys.exit(f"narration too long for the current limit ({dur / 60:.1f} min > {MAX_MINUTES:.1f} min). "
+                 "Raise MAX_MINUTES after verifying the channel (youtube.com/verify), or lower TARGET_MINUTES/WORDS_TARGET.")
 
     thumb = WORK / "thumb.png"
     thumb_q = ep.get("thumbnail_query") or (queries[0] if queries else "galaxy cosmos")
@@ -710,7 +767,10 @@ def main():
         drive_backup(out_mp4)
     except Exception as e:
         log("drive backup failed (non-fatal):", e)
-    mark_done(row["id"])
+    if row["id"] in {r["id"] for r in csv.DictReader(open(EPISODES_CSV, encoding="utf-8"))}:
+        mark_done(row["id"])
+    else:
+        log("one-off episode (not in episodes.csv) - rotation state left untouched")
     log("done -> https://youtu.be/" + vid)
 
 if __name__ == "__main__":
