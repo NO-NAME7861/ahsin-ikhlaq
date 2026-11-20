@@ -97,7 +97,7 @@ Reply ONLY with valid JSON in this shape (no markdown, no extra text):
 }}
 
 Rules:
-- One question MUST be pure astronomy/cosmology, one MUST be philosophy/stoicism/big-picture.
+- One question MUST be pure astronomy/cosmology, one MUST be psychology or philosophy/stoicism/big-picture.
 - Options must be plausible and self-consistent; avoid obviously-wrong throwaway options.
 - Keep it fun, not textbook-dry.
 Topic date: {tag}."""
