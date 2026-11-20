@@ -268,8 +268,8 @@ def make_segment(img, seg, d, zoom_in):
           f"zoompan={z}:d={frames}:s={W}x{H}:fps={FPS},"
           f"eq=brightness=0.0,format=yuv420p")
     subprocess.run(["ffmpeg", "-y", "-loop", "1", "-i", str(img), "-t", f"{d:.3f}",
-                    "-vf", vf, "-r", str(FPS), "-c:v", "libx264", "-preset", "ultrafast",
-                    "-crf", "26", str(seg)],
+                    "-vf", vf, "-r", str(FPS), "-c:v", "libx264", "-preset", "fast",
+                    "-crf", "20", str(seg)],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def build_video(image_paths, audio, srt, out_mp4):
@@ -304,12 +304,12 @@ def build_video(image_paths, audio, srt, out_mp4):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Sans,FontSize=22,Bold=-1,PrimaryColour=&H00FFFFFF,"
-                 "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=70")
+    sub_style = ("FontName=Noto Sans,FontSize=48,Bold=-1,PrimaryColour=&H00FFFFFF,"
+                 "OutlineColour=&H00000000,BorderStyle=4,Outline=3,Shadow=0,MarginV=80")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
-                    "-c:a", "aac", "-b:a", "128k", "-shortest", str(out_mp4)],
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+                    "-c:a", "aac", "-b:a", "192k", "-shortest", str(out_mp4)],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log("video ready:", out_mp4)
 

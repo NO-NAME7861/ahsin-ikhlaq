@@ -4,7 +4,7 @@
 Ahsin Akhlaq — Universe & Philosophy Automation
 Pipeline: LLM script (expert-level cosmology + philosophy, Hindi + English terms)
           -> NASA image library (real photos; Pollinations fallback, local starfield last resort)
-          -> edge-tts en-IN Neerja expressive voice -> 1024x576 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
+          -> edge-tts en-IN Neerja expressive voice -> 1920x1080 video (Ken Burns + subtitles) -> YouTube upload -> Drive backup
 Run locally (test):  DRY_RUN=1 python generate_episode.py
 Run in CI:           private run first, then set UPLOAD=1
 """
@@ -54,7 +54,9 @@ LONG_MODE          = TARGET_MINUTES >= 15
 MAX_MINUTES        = float(os.environ.get("MAX_MINUTES", "14.2"))  # raise after channel verification
 EPISODE_TOPIC      = os.environ.get("EPISODE_TOPIC", "").strip()   # one-off topic override (no csv edit)
 EPISODE_MORAL      = os.environ.get("EPISODE_MORAL", "").strip()
-W, H, FPS = 1024, 576, 25
+W, H, FPS = 1920, 1080, 25
+VIDEO_PRESET       = os.environ.get("VIDEO_PRESET", "fast")
+VIDEO_CRF          = os.environ.get("VIDEO_CRF", "20")
 _n_img_env = os.environ.get("N_IMAGES", "").strip()
 N_IMAGES           = int(_n_img_env) if _n_img_env else (20 if LONG_MODE else 16)
 CHANNEL_NAME = "Ahsin Akhlaq"
@@ -516,8 +518,8 @@ def make_segment(img, seg, d, zoom_in):
           f"zoompan={z}:d={frames}:s={W}x{H}:fps={FPS},"
           f"eq=brightness=0.0,format=yuv420p")
     cmd = ["ffmpeg", "-y", "-loop", "1", "-i", str(img), "-t", f"{d:.3f}",
-           "-vf", vf, "-r", str(FPS), "-c:v", "libx264", "-preset", "ultrafast",
-           "-crf", "27", str(seg)]
+           "-vf", vf, "-r", str(FPS), "-c:v", "libx264", "-preset", VIDEO_PRESET,
+           "-crf", VIDEO_CRF, str(seg)]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def mix_narration_with_bgm(audio):
@@ -559,12 +561,14 @@ def build_video(image_paths, audio, srt, out_mp4, thumb):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Sans,FontSize=16,Bold=-1,PrimaryColour=&H00FFFFFF,"
-                 "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=22")
+    font_size = max(20, int(30 * H / 1080))
+    margin_v = max(24, int(40 * H / 1080))
+    sub_style = (f"FontName=Noto Sans,FontSize={font_size},Bold=-1,PrimaryColour=&H00FFFFFF,"
+                 f"OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV={margin_v}")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
-                    "-c:a", "aac", "-b:a", "128k", "-shortest", str(out_mp4)],
+                    "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", VIDEO_CRF,
+                    "-c:a", "aac", "-b:a", "192k", "-shortest", str(out_mp4)],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log("video ready:", out_mp4)
 
