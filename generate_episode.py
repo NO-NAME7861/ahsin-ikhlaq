@@ -267,7 +267,8 @@ def call_llm(row):
  "image_prompts": ["{n_img_prompts} SHORT prompts, each: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description: e.g. 'interior of an accretion disk around a supermassive black hole seen from a nearby camera, gravitational lensing, photon ring'>. Use space imagery: nebulae, exoplanets, observatories, astronauts, planet surfaces, deep field images, star clusters."],
   "image_queries": ["{n_img_prompts} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
-  "thumbnail_query": "2-4 word NASA search phrase for the thumbnail, e.g. 'earth from space'"
+  "thumbnail_query": "2-4 word NASA search phrase for the thumbnail, e.g. 'earth from space'",
+  "thumbnail_hook": "2-4 word ALL-CAPS curiosity hook for the thumbnail, e.g. 'WHERE IS EVERYONE?' or 'YOUR BRAIN LIES' - English only, no ending period"
 }}
 
 Episode brief (topic + central insight):
@@ -312,6 +313,7 @@ def call_llm_long(row, sys_prompt, _unused):
   "image_queries": ["{N_IMAGES} SHORT NASA-image-library search phrases matching the prompts above, each 2-4 words, e.g. 'black hole accretion disk', 'james webb deep field', 'voyager spacecraft', 'orion nebula hubble'. Pure ASCII, no punctuation."],
  "thumbnail_prompt": "one dramatic photorealistic prompt for a 16:9 thumbnail, high contrast, no text, no watermark",
   "thumbnail_query": "2-4 word NASA search phrase for the thumbnail, e.g. 'earth from space'",
+  "thumbnail_hook": "2-4 word ALL-CAPS curiosity hook for the thumbnail, e.g. 'WHERE IS EVERYONE?' or 'YOUR BRAIN LIES' - English only, no ending period",
  "outline": ["8 scene summaries with the key scientific facts, numbers and philosophers to cover, in order â€” this is the plan for the 3 narrative parts"]
 }}
 
@@ -629,11 +631,20 @@ def youtube_upload(ep, mp4, thumbnail):
     log(f"uploaded: https://youtu.be/{vid}")
 
     if thumbnail and Path(thumbnail).exists():
-        try:
-            yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(thumbnail))).execute()
-            log("thumbnail set")
-        except Exception as e:
-            log("thumbnail set skipped (channel likely lacks custom thumbnail permission):", e)
+        thumb_path = Path(thumbnail)
+        size_kb = thumb_path.stat().st_size // 1024
+        for attempt in range(3):
+            try:
+                yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(thumb_path))).execute()
+                log(f"thumbnail set ({size_kb} KB)")
+                break
+            except Exception as e:
+                msg = str(e)
+                log(f"thumbnail attempt {attempt + 1}/3 failed: {msg[:300]}")
+                if attempt < 2:
+                    time.sleep(20 + attempt * 20)
+        else:
+            log("WARNING: thumbnail could not be set - video has an auto frame thumbnail")
     return vid
 
 def drive_backup(mp4):
@@ -664,11 +675,13 @@ def drive_backup(mp4):
 
 # ---------------------------------------------------------------- playlist
 
-def playlist_for():
-    """Return the playlist ID, creating the playlist if missing."""
-    if PLAYLIST_ID:
+def playlist_for(title=None, desc=None, lang="hi"):
+    """Return a playlist ID by title, creating it if missing."""
+    if PLAYLIST_ID and not title:
         return PLAYLIST_ID
-    title = PLAYLIST_TITLE
+    title = title or PLAYLIST_TITLE
+    desc = desc or ("Universe exploration and philosophy deep dives. "
+                    "Every episode explores one profound question about the cosmos and the human condition.")
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
@@ -680,10 +693,8 @@ def playlist_for():
         for item in resp.get("items", []):
             if item["snippet"]["title"] == title:
                 return item["id"]
-        desc = ("Universe exploration and philosophy deep dives. "
-                "Every episode explores one profound question about the cosmos and the human condition.")
         p = yt.playlists().insert(part="snippet,status",
-            body={"snippet": {"title": title, "description": desc, "defaultLanguage": "hi"},
+            body={"snippet": {"title": title, "description": desc, "defaultLanguage": lang},
                   "status": {"privacyStatus": "public"}}).execute()
         log(f"created playlist: {title} -> {p['id']}")
         return p["id"]
@@ -691,9 +702,28 @@ def playlist_for():
         log("WARNING: playlist lookup failed:", e)
         return None
 
-def add_to_playlist(video_id):
-    pid = playlist_for()
-    if not pid:
+# Pillar playlists - every new episode is added to its pillar as well as the
+# main deep-dives playlist, so the channel reads as three clear series.
+PILLAR_PLAYLISTS = {
+    "cosmos": ("Cosmos Files",
+               "Deep dives into black holes, galaxies, quantum physics and the origin of the universe."),
+    "mind": ("The Mind Files",
+             "Consciousness, perception and the self - where neuroscience meets philosophy."),
+    "brain": ("Brain Traps",
+              "Psychology, biases and the hidden machinery of everyday decisions."),
+}
+
+def add_to_playlist(video_id, pillar=None):
+    targets = []
+    main = playlist_for()
+    if main:
+        targets.append(main)
+    if pillar in PILLAR_PLAYLISTS:
+        t, d = PILLAR_PLAYLISTS[pillar]
+        pid = playlist_for(t, d, "en")
+        if pid and pid not in targets:
+            targets.append(pid)
+    if not targets:
         log("no playlist id - skipping playlist add")
         return
     from google.oauth2.credentials import Credentials
@@ -702,19 +732,29 @@ def add_to_playlist(video_id):
               "https://www.googleapis.com/auth/youtube"]
     creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
     yt = build("youtube", "v3", credentials=creds, cache_discovery=False)
-    try:
-        yt.playlistItems().insert(part="snippet",
-            body={"snippet": {"playlistId": pid,
-                              "resourceId": {"kind": "youtube#video", "videoId": video_id}}}).execute()
-        log(f"added to playlist {pid}")
-    except Exception as e:
-        log("playlist add failed (non-fatal):", e)
+    for pid in targets:
+        try:
+            yt.playlistItems().insert(part="snippet",
+                body={"snippet": {"playlistId": pid,
+                                  "resourceId": {"kind": "youtube#video", "videoId": video_id}}}).execute()
+            log(f"added to playlist {pid}")
+        except Exception as e:
+            log(f"playlist add failed ({pid}, non-fatal):", e)
 
 # ---------------------------------------------------------------- main
 
 IMAGE_SUFFIX = (", photorealistic, cinematic, dramatic lighting, ultra detailed, "
                 "documentary style, no text, no watermark")
 THUMB_SUFFIX = (", photorealistic, cinematic, dramatic, high contrast, no text, no watermark")
+
+
+def _hook_from_title(title: str) -> str:
+    """Fallback thumbnail hook when the LLM did not return one."""
+    t = (title or "").split(":")[0].split("?")[0].strip()
+    words = [w for w in t.replace("-", " ").split() if w.lower() not in
+             ("the", "a", "an", "of", "and", "why", "how", "what", "is", "are")]
+    return " ".join(words[:3]).upper() or "THE UNIVERSE"
+
 
 def main():
     if not OPENROUTER_API_KEY:
@@ -754,9 +794,17 @@ def main():
         sys.exit(f"narration too long for the current limit ({dur / 60:.1f} min > {MAX_MINUTES:.1f} min). "
                  "Raise MAX_MINUTES after verifying the channel (youtube.com/verify), or lower TARGET_MINUTES/WORDS_TARGET.")
 
-    thumb = WORK / "thumb.png"
+    thumb_base = WORK / "thumb_base.png"
     thumb_q = ep.get("thumbnail_query") or (queries[0] if queries else "galaxy cosmos")
-    gen_image(ep.get("thumbnail_prompt", prompts[0]) + THUMB_SUFFIX, thumb, seed0 + 999, query=thumb_q)
+    gen_image(ep.get("thumbnail_prompt", prompts[0]) + THUMB_SUFFIX, thumb_base, seed0 + 999, query=thumb_q)
+
+    # Branded 1280x720 thumbnail: bold hook text + pillar badge (COSMOS/MIND/BRAIN).
+    from thumbnail import make_thumbnail, pillar_for
+    hook = (ep.get("thumbnail_hook") or "").strip() or _hook_from_title(ep.get("title", ""))
+    pillar = pillar_for(row["topic"] + " " + ep.get("title", ""))
+    thumb = WORK / "thumb.jpg"
+    make_thumbnail(thumb_base, hook, pillar, thumb)
+    log(f"thumbnail built (hook='{hook}', pillar={pillar})")
 
     out_mp4 = WORK / f"episode_{row['id']}.mp4"
     build_video(image_paths, mp3, srt, out_mp4, thumb)
@@ -766,7 +814,7 @@ def main():
         return
 
     vid = youtube_upload(ep, out_mp4, thumb)
-    add_to_playlist(vid)
+    add_to_playlist(vid, pillar)
     try:
         drive_backup(out_mp4)
     except Exception as e:

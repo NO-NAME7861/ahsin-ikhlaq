@@ -313,7 +313,7 @@ def build_video(image_paths, audio, srt, out_mp4):
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log("video ready:", out_mp4)
 
-def youtube_upload(ep, mp4):
+def youtube_upload(ep, mp4, thumbnail=None):
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -347,6 +347,17 @@ def youtube_upload(ep, mp4):
         if status:
             log(f"upload {int(status.progress() * 100)}%")
     log(f"uploaded: https://youtu.be/{resp['id']}")
+    if thumbnail and Path(thumbnail).exists():
+        for attempt in range(3):
+            try:
+                yt.thumbnails().set(videoId=resp["id"],
+                                    media_body=MediaFileUpload(str(thumbnail))).execute()
+                log("thumbnail set")
+                break
+            except Exception as e:
+                log(f"thumbnail attempt {attempt + 1}/3 failed: {str(e)[:250]}")
+                if attempt < 2:
+                    time.sleep(20 + attempt * 20)
     add_to_playlist(resp["id"])
     return resp["id"]
 
@@ -422,7 +433,8 @@ def main():
  "narration": "~110-130 words of natural Romanized Hindi-Urdu (Latin script, transliterated, e.g. 'doston, universe socha...' - NEVER Devanagari) with English technical terms. Dense, punchy, no fluff. Absolutely MUST open with a hard-hitting hook in the first sentence. End with a thought-provoking question or quote. Do NOT repeat the title verbatim.",
  "image_prompts": ["5 SHORT vertical photorealistic prompts: photorealistic, cinematic, dramatic lighting, ultra detailed, no text, no watermark, <scene description>"],
   "image_queries": ["5 SHORT NASA-image-library search phrases matching the prompts, each 2-4 words, e.g. 'voyager spacecraft', 'webb deep field'. Pure ASCII, no punctuation."],
- "thumbnail_prompt": "one dramatic vertical photorealistic thumbnail prompt, no text, no watermark"
+ "thumbnail_prompt": "one dramatic vertical photorealistic thumbnail prompt, no text, no watermark",
+ "thumbnail_hook": "2-4 word ALL-CAPS curiosity hook for the thumbnail, e.g. 'TIME IS A LIE' - English only, no ending period"
 }}
 
 Topic: {topic}
@@ -501,11 +513,31 @@ Angle: {angle}"""
     out_mp4 = WORK / f"short_{ep_id}.mp4"
     build_video(image_paths, mp3, srt, out_mp4)
 
+    # 16:9 branded thumbnail (crop a centre band out of the first vertical image).
+    thumb = None
+    try:
+        from PIL import Image
+        from thumbnail import make_thumbnail, pillar_for
+        src = Image.open(image_paths[0]).convert("RGB")
+        w, h = src.size
+        band_h = int(w * 9 / 16)
+        top = max(0, (h - band_h) // 2)
+        band = WORK / "thumb_band.jpg"
+        src.crop((0, top, w, top + band_h)).save(band, "JPEG", quality=95)
+        hook = (ep.get("thumbnail_hook") or "").strip() or ep["title"].split(":")[0][:32].upper()
+        pillar = pillar_for(topic + " " + ep["title"])
+        thumb = WORK / f"thumb_{ep_id}.jpg"
+        make_thumbnail(band, hook, pillar, thumb)
+        log(f"thumbnail built (hook='{hook}', pillar={pillar})")
+    except Exception as e:
+        log("thumbnail build failed (non-fatal):", e)
+        thumb = None
+
     if DRY_RUN or not UPLOAD:
         log("DRY_RUN/UPLOAD=0 - skipping upload. Video at:", out_mp4)
         return
 
-    vid = youtube_upload(ep, out_mp4)
+    vid = youtube_upload(ep, out_mp4, thumb)
     mark_done(ep_id)
     log("done -> https://youtu.be/" + vid)
 
