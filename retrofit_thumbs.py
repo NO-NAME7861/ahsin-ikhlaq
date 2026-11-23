@@ -39,6 +39,16 @@ def log(*a):
     print(*a, flush=True)
 
 
+def _is_frame_thumb(path):
+    """Older uploads only have a 640x480 auto frame, which carries subtitles."""
+    try:
+        from PIL import Image
+        w, h = Image.open(path).size
+        return max(w, h) <= 640
+    except Exception:
+        return False
+
+
 def fetch(url, timeout=150):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -98,6 +108,7 @@ def main():
 
         base = WORK / f"base_{vid}.jpg"
         out = WORK / f"thumb_{vid}.jpg"
+        from_current = False
 
         if item.get("base") and Path(item["base"]).exists():
             base.write_bytes(Path(item["base"]).read_bytes())
@@ -109,8 +120,10 @@ def main():
                     log("    NO BASE IMAGE - skipping")
                     failed.append(vid)
                     continue
+                from_current = True
 
-        make_thumbnail(base, hook, pillar, out)
+        make_thumbnail(base, hook, pillar, out,
+                       trim_bottom=0.20 if (from_current or _is_frame_thumb(base)) else 0.08)
         log(f"    composed {out.name} ({out.stat().st_size // 1024} KB)")
 
         if a.dry_run:

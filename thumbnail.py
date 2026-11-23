@@ -158,18 +158,23 @@ def _rounded(draw, box, radius, fill):
 
 
 def make_thumbnail(base_image, hook: str, pillar: str, out_path,
-                   channel: str = "AHSIN AKHLAQ") -> Path:
-    """Render a branded 1280x720 thumbnail. Returns the output path."""
+                   channel: str = "AHSIN AKHLAQ",
+                   trim_bottom: float = 0.08, trim_right: float = 0.05) -> Path:
+    """Render a branded 1280x720 thumbnail. Returns the output path.
+
+    trim_bottom/trim_right: fractions cut from the source before cover-cropping.
+    Video-frame fallbacks carry burned-in subtitles, so they need a bigger cut.
+    """
     pillar = pillar if pillar in PILLARS else pillar_for(hook)
     accent = PILLARS[pillar]["accent"]
     label = PILLARS[pillar]["label"]
 
     img = Image.open(base_image).convert("RGB")
-    # Generators often stamp a small logo in the bottom-right corner.
-    # Trimming 6% off the bottom + 4% off the right removes it without
-    # touching the subject, then we cover-crop back to 16:9.
+    # Generators often stamp a logo bottom-right, and video-frame fallbacks can
+    # carry burned-in subtitles along the bottom. Trim those edges, then
+    # cover-crop back to exactly 16:9.
     sw, sh = img.size
-    img = img.crop((0, 0, int(sw * 0.96), int(sh * 0.94)))
+    img = img.crop((0, 0, int(sw * (1 - trim_right)), int(sh * (1 - trim_bottom))))
     img = _cover(img, W, H)
     # Punch up the photo a little; thumbnails are viewed small.
     img = ImageEnhance.Contrast(img).enhance(1.10)
