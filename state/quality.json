@@ -1,5 +1,27 @@
 {
-  "history": [],
-  "best": 0,
+  "history": [
+    {
+      "id": "001",
+      "score": 78,
+      "breakdown": {
+        "hook": 15,
+        "facts": 20,
+        "structure": 9,
+        "length": 12,
+        "repetition": 6,
+        "clarity": 10,
+        "ending": 0,
+        "packaging": 6
+      },
+      "issues": [
+        "13 scenes - aim for 6-12 paragraphs.",
+        "Thumbnail hook must be 2-4 words."
+      ],
+      "words": 1179,
+      "at": "2026-11-24T12:33:32Z",
+      "title": "You Live in the Past: The Universe Is Far Away in Time"
+    }
+  ],
+  "best": 78,
   "lessons": []
 }
