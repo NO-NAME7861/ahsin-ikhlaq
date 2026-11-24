@@ -1,6 +1,7 @@
 # Thank-You Episode — For Our First Subscriber
-Status: DRAFT - do NOT upload until the first subscriber arrives
+Status: PUBLISHED 2026-11-24 → https://youtu.be/v_RUZIfMKN0 (3:16, 1080p, public)
 Purpose: a thankful, respectful video addressed to the FIRST person who subscribes to the Ahsin Akhlaq channel
+Builder: `make_thankyou.py` (hand-written narration, NASA images, branded thumbnail)
 
 ## Video brief (feed to the pipeline as EPISODE_INDEX one-off when the time comes)
 
