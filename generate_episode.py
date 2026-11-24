@@ -14,6 +14,8 @@ import urllib.request, urllib.parse
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+import quality  # script scoring + "beat the last episode" history
+
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "work"
 STATE_FILE = ROOT / "state" / "episodes.json"
@@ -273,7 +275,9 @@ def call_llm(row):
 
 Episode brief (topic + central insight):
 Topic seed: {row['topic']}
-Central insight: {row['moral']}"""
+Central insight: {row['moral']}
+
+{quality.prompt_context()}"""
 
     if LONG_MODE:
         ep = call_llm_long(row, sys_prompt, user_prompt)
@@ -318,7 +322,9 @@ def call_llm_long(row, sys_prompt, _unused):
 }}
 
 Topic seed: {row['topic']}
-Central insight: {row['moral']}"""
+Central insight: {row['moral']}
+
+{quality.prompt_context()}"""
     meta = _llm_with_fallback(sys_prompt, meta_prompt, 4500, "meta")
     outline = meta.get("outline", [])
     outline_txt = "\n".join(f"Scene {i+1}: {o}" for i, o in enumerate(outline))
@@ -330,6 +336,8 @@ Central insight: {row['moral']}"""
 
 Episode topic: {row['topic']}
 Central insight: {row['moral']}
+
+{quality.prompt_context()}
 
 FULL OUTLINE (do NOT repeat what other parts cover - write ONLY your assigned scenes):
 {outline_txt}
@@ -756,6 +764,52 @@ def _hook_from_title(title: str) -> str:
     return " ".join(words[:3]).upper() or "THE UNIVERSE"
 
 
+def revise_episode(row, ep, result):
+    """One targeted rewrite pass that fixes exactly what the scorer flagged.
+
+    Only the words change - the visual plan (image prompts/queries) is kept, so
+    this costs one LLM call and no extra images.
+    """
+    issues = "\n".join(f"- {i}" for i in result.get("issues", [])) or "- tighten everything"
+    current = {k: ep.get(k) for k in
+               ("title", "description", "tags", "moral", "narration", "thumbnail_hook")}
+    prompt = f"""A quality checker scored this episode {result['score']}/100. Rewrite it so it scores higher.
+
+Fix EVERY problem below, without losing scientific accuracy or inventing facts:
+{issues}
+
+Hard rules:
+- narration must stay about {WORDS_TARGET} words (plus/minus 5%), 6-10 scenes separated by blank lines
+- {LANG_STYLE}; {SCRIPT_RULE}
+- keep the same topic and the same central insight
+- title max 70 characters, English only
+- thumbnail_hook is 2-4 words, ALL CAPS
+- never mention AI, artificial intelligence, AI-generated or synthetic content
+
+Current episode JSON:
+{json.dumps(current, ensure_ascii=False)}
+
+Reply with the SAME JSON shape (title, description, tags, moral, narration, thumbnail_hook) and nothing else."""
+    try:
+        fixed = _llm_with_fallback(
+            "You are a ruthless YouTube script editor. You fix weak hooks, vague claims, "
+            "padded writing and long sentences. You never invent facts. "
+            "Reply ONLY with valid JSON, no markdown fences.",
+            prompt, 8000, "quality-revision")
+    except Exception as e:
+        log("quality revision failed (non-fatal):", e)
+        return None
+    if not isinstance(fixed, dict) or not (fixed.get("narration") or "").strip():
+        log("quality revision returned no narration - keeping original")
+        return None
+    for key in ("title", "description", "tags", "moral", "narration", "thumbnail_hook"):
+        if fixed.get(key):
+            ep[key] = fixed[key]
+    ep["title"] = scrub_ai_text(ep.get("title", ""))
+    ep["description"] = scrub_ai_text(ep.get("description", ""))
+    return ep
+
+
 def main():
     if not OPENROUTER_API_KEY:
         sys.exit("OPENROUTER_API_KEY not set")
@@ -767,6 +821,32 @@ def main():
     ep["title"] = scrub_ai_text(ep.get("title", ""))
     ep["description"] = scrub_ai_text(ep.get("description", ""))
     log("LLM wrote:", ep["title"])
+
+    # --- quality gate -------------------------------------------------------
+    # Score the script, do ONE targeted rewrite if it is below the target
+    # (every episode must beat the best previous one), then record the result
+    # so state/quality.json feeds lessons into tomorrow's prompt.
+    result = quality.score_episode(ep, row, WORDS_TARGET)
+    target = quality.target_score()
+    log(f"quality score {result['score']}/100 (target {target}+)")
+    if result["issues"]:
+        log("issues:", "; ".join(result["issues"]))
+    if row["id"] == "special":
+        # One-off specials (thank-you, announcements) must not be rewritten into
+        # deep dives and must not sit on the normal quality ladder.
+        log("one-off special: revision skipped, not added to the quality ladder")
+    else:
+        if result["score"] < target and os.environ.get("QUALITY_REVISE", "1") == "1":
+            revised = revise_episode(row, ep, result)
+            if revised:
+                r2 = quality.score_episode(revised, row, WORDS_TARGET)
+                log(f"revision score {r2['score']}/100")
+                if r2["score"] >= result["score"]:
+                    ep, result = revised, r2
+        quality.record(row["id"], result, {"title": ep.get("title", "")[:90]})
+        log(f"final quality {result['score']}/100 "
+            f"(best so far {quality.load_history().get('best', 0)})")
+
     (WORK / "episode.json").write_text(json.dumps(ep, indent=2, ensure_ascii=False))
 
     narration = ep["narration"]
@@ -801,7 +881,9 @@ def main():
     # Branded 1280x720 thumbnail: bold hook text + pillar badge (COSMOS/MIND/BRAIN).
     from thumbnail import make_thumbnail, pillar_for
     hook = (ep.get("thumbnail_hook") or "").strip() or _hook_from_title(ep.get("title", ""))
-    pillar = pillar_for(row["topic"] + " " + ep.get("title", ""))
+    pillar = (row.get("pillar") or "").strip().lower()
+    if pillar not in ("cosmos", "mind", "brain"):
+        pillar = pillar_for(row["topic"] + " " + ep.get("title", ""))
     thumb = WORK / "thumb.jpg"
     make_thumbnail(thumb_base, hook, pillar, thumb)
     log(f"thumbnail built (hook='{hook}', pillar={pillar})")
