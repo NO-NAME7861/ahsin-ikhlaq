@@ -96,6 +96,9 @@ def main():
     seed0 = 20261124
     for i, (prompt, query) in enumerate(SHOTS):
         dest = WORK / f"img_{i:02d}.png"
+        if dest.exists() and dest.stat().st_size > 15_000:
+            image_paths.append(dest)
+            continue
         if ge.gen_image(prompt + ge.IMAGE_SUFFIX, dest, seed0 + i, query=query):
             image_paths.append(dest)
         ge.time.sleep(2)
@@ -104,14 +107,16 @@ def main():
     ge.log(f"images ready: {len(image_paths)}")
 
     mp3, srt = WORK / "narration.mp3", WORK / "narration.srt"
-    ge.run_tts(WORK / "narration.txt", mp3, srt)
+    if not (mp3.exists() and mp3.stat().st_size > 50_000 and srt.exists()):
+        ge.run_tts(WORK / "narration.txt", mp3, srt)
     dur = ge.media_duration(mp3)
     ge.log(f"narration duration: {dur:.1f}s ({dur / 60:.2f} min)")
 
-    thumb_base = WORK / "thumb_base.png"
-    ge.gen_image("Earth seen from orbit, deep blue ocean and white clouds, cinematic, "
-                 "high contrast, photorealistic" + ge.THUMB_SUFFIX,
-                 thumb_base, seed0 + 999, query="earth from orbit")
+    thumb_base = WORK / "thumb_base_v2.png"
+    if not (thumb_base.exists() and thumb_base.stat().st_size > 15_000):
+        ge.gen_image("planet Earth fully lit against deep black space, blue marble, "
+                     "cinematic, high contrast, photorealistic" + ge.THUMB_SUFFIX,
+                     thumb_base, seed0 + 999, query="blue marble earth")
 
     from thumbnail import make_thumbnail
     thumb = WORK / "thumb_thankyou.jpg"
@@ -119,7 +124,8 @@ def main():
     ge.log(f"thumbnail built: {thumb}")
 
     out_mp4 = WORK / "thankyou_first_subscriber.mp4"
-    ge.build_video(image_paths, mp3, srt, out_mp4, thumb)
+    if not (out_mp4.exists() and out_mp4.stat().st_size > 1_000_000):
+        ge.build_video(image_paths, mp3, srt, out_mp4, thumb)
 
     if os.environ.get("DRY_RUN", "0") == "1" or os.environ.get("UPLOAD", "1") != "1":
         ge.log("build only - video at:", out_mp4)

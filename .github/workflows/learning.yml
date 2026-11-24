@@ -23,7 +23,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install google-api-python-client google-auth
+        run: pip install google-api-python-client google-auth Pillow
 
       - name: Decode YouTube token
         env:
