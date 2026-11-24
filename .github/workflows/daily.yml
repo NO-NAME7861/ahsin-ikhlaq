@@ -25,11 +25,11 @@ on:
         default: ""
         type: string
       narration_lang:
-        description: "Narration language: hi = Romanized Hindi-Urdu, en = English"
+        description: "Narration language: hi = Romanized Hindi-Urdu, en = English, ur = pure Roman Urdu"
         required: false
         default: "hi"
         type: choice
-        options: ["hi", "en"]
+        options: ["hi", "en", "ur"]
       episode_topic:
         description: "One-off topic override (leave empty to use episodes.csv rotation)"
         required: false
@@ -87,7 +87,7 @@ jobs:
           EPISODES_CSV: ${{ vars.EPISODES_CSV || 'episodes.csv' }}
           EPISODE_INDEX: ${{ inputs.episode_index || '' }}
           TARGET_MINUTES: ${{ inputs.target_minutes || vars.TARGET_MINUTES || '12' }}
-          NARRATION_LANG: ${{ inputs.narration_lang || 'hi' }}
+          NARRATION_LANG: ${{ inputs.narration_lang || vars.NARRATION_LANG || 'hi' }}
           EPISODE_TOPIC: ${{ inputs.episode_topic || '' }}
           EPISODE_MORAL: ${{ inputs.episode_moral || '' }}
           MAX_MINUTES: ${{ inputs.max_minutes || '14.2' }}

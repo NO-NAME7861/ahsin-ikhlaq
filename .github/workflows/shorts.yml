@@ -19,6 +19,12 @@ on:
         required: false
         default: ""
         type: string
+      narration_lang:
+        description: "Narration language: hi = Romanized Hindi-Urdu, en = English, ur = pure Roman Urdu"
+        required: false
+        default: "hi"
+        type: choice
+        options: ["hi", "en", "ur"]
 
 permissions:
   contents: write
@@ -59,6 +65,7 @@ jobs:
           TTS_VOICE: ${{ vars.TTS_VOICE || 'en-IN-NeerjaExpressiveNeural' }}
           PRIVACY_STATUS: ${{ inputs.privacy || vars.PRIVACY_STATUS || 'public' }}
           SHORTS_TOPIC: ${{ inputs.shorts_topic || '' }}
+          NARRATION_LANG: ${{ inputs.narration_lang || vars.NARRATION_LANG || 'hi' }}
           UPLOAD: "1"
         run: python generate_short.py
 

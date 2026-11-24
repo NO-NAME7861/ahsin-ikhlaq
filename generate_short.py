@@ -28,11 +28,24 @@ FALLBACK_MODELS    = [m for m in [
     "google/gemma-4-26b-a4b-it:free",
 ] ]
 VOICE              = os.environ.get("TTS_VOICE", "en-IN-NeerjaExpressiveNeural")  # Indian expressive female (Hinglish/Roman Urdu)
-TTS_RATE           = os.environ.get("TTS_RATE", "+0%")
+NARRATION_LANG     = os.environ.get("NARRATION_LANG", "hi").strip().lower()
+ENGLISH_MODE       = NARRATION_LANG.startswith("en")
+PURE_URDU_MODE     = NARRATION_LANG == "ur"   # pure Roman Urdu, Latin script, simple words, no English technical terms
+TTS_RATE           = os.environ.get("TTS_RATE", "+22%" if ENGLISH_MODE else "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")
 UPLOAD             = os.environ.get("UPLOAD", "1") == "1"
 DRY_RUN            = os.environ.get("DRY_RUN", "0") == "1"
 SHORTS_INDEX       = os.environ.get("SHORTS_INDEX", "").strip()
+
+# Narration style for Shorts: English mode, pure Roman Urdu mode, or default Romanized Hindi-Urdu.
+SHORT_STYLE = (
+    "clear, vivid, neutral ENGLISH (simple words a 12-year-old understands, short sentences, no Hindi or Urdu phrases)"
+    if ENGLISH_MODE else
+    "pure ROMAN URDU, Latin script only, simple words a 12-year-old understands, short sentences, "
+    "natural spoken Urdu, warm second person address, NO English words or English technical terms"
+    if PURE_URDU_MODE else
+    "natural, warm ROMANIZED Hindi-Urdu (Latin script, transliterated) with English technical terms"
+)
 
 W, H, FPS = 1080, 1920, 30
 N_IMAGES = 5
@@ -331,7 +344,7 @@ def youtube_upload(ep, mp4, thumbnail=None):
             "description": ep["description"],
             "tags": ep.get("tags", [])[:15],
             "categoryId": "27",  # Education
-            "defaultLanguage": "en",
+            "defaultLanguage": "en" if ENGLISH_MODE else "hi",
         },
         "status": {
             "privacyStatus": PRIVACY_STATUS,
@@ -376,7 +389,7 @@ def playlist_for():
         p = yt.playlists().insert(part="snippet,status",
             body={"snippet": {"title": PLAYLIST_TITLE,
                               "description": "Universe & philosophy shorts — quick cosmic hits.",
-                              "defaultLanguage": "en"},
+            "defaultLanguage": "en" if ENGLISH_MODE else "hi"},
                   "status": {"privacyStatus": "public"}}).execute()
         log(f"created playlist: {PLAYLIST_TITLE} -> {p['id']}")
         return p["id"]
@@ -421,7 +434,7 @@ def main():
 
     sys_prompt = (
         f"You are a viral YouTube Shorts writer for '{CHANNEL_NAME}', a cosmic deep-dive channel. "
-        "You write SHORT (under 55 seconds) vertical videos in natural, warm ROMANIZED Hindi-Urdu (Latin script, transliterated) with English technical terms "
+        f"You write SHORT (under 55 seconds) vertical videos in {SHORT_STYLE} "
         "(e.g., 'black hole', 'redshift'). Simple words, short sentences, natural second-person address. You are a master of the first-second hook. "
         "Reply ONLY with valid JSON, no markdown fences."
     )
@@ -458,7 +471,7 @@ Angle: {angle}"""
     if _has_non_latin_script(ep.get("narration", "")):
         log("narration contains non-Latin script - rewriting in Latin script")
         raw2 = call_llm(sys_prompt,
-                        f"Your previous narration contained Devanagari or Urdu characters. Rewrite the SAME short (~110-130 words) STRICTLY in ROMAN/Latin script transliterated Hindi-Urdu (e.g., 'Dosto, sunte ho?') - ZERO Devanagari or Urdu characters. Topic: {topic}. Angle: {angle}. Keep it punchy with a hard-hitting hook. Reply ONLY with the narration as plain text.",
+                        f"Your previous narration contained Devanagari or Urdu characters. Rewrite the SAME short (~110-130 words) STRICTLY in ROMAN/Latin script transliterated Hindi-Urdu (e.g., 'Dosto, sunte ho?') - ZERO Devanagari or Urdu characters, and in {SHORT_STYLE}. Topic: {topic}. Angle: {angle}. Keep it punchy with a hard-hitting hook. Reply ONLY with the narration as plain text.",
                         max_tokens=1500)
         if not _has_non_latin_script(raw2):
             ep["narration"] = raw2.strip()
