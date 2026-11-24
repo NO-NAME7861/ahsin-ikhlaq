@@ -575,16 +575,17 @@ def build_video(image_paths, audio, srt, out_mp4, thumb):
     margin_v = max(24, int(40 * H / 1080))
     sub_style = (f"FontName=Noto Sans,FontSize={font_size},Bold=-1,PrimaryColour=&H00FFFFFF,"
                  f"OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV={margin_v}")
-    # ffmpeg filter syntax treats ':' as an option separator, so a Windows
-    # drive letter (C:/...) must be escaped. No-op on Linux CI.
-    srt_filter = srt.as_posix()
-    if len(srt_filter) > 1 and srt_filter[1] == ":":
-        srt_filter = srt_filter[0] + "\\:" + srt_filter[2:]
+    # ffmpeg's subtitles filter treats ':' as an option separator and chokes on
+    # spaces in absolute Windows paths. Running from the subtitle's folder and
+    # passing just the file name avoids both problems (and is a no-op on Linux).
+    sub_cwd = str(Path(srt).resolve().parent)
+    sub_file = Path(srt).name
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
-                    "-vf", f"subtitles={srt_filter}:force_style='{sub_style}'",
+                    "-vf", f"subtitles={sub_file}:force_style='{sub_style}'",
                     "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", VIDEO_CRF,
                     "-c:a", "aac", "-b:a", "192k", "-shortest", str(out_mp4)],
-                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                   check=True, cwd=sub_cwd,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log("video ready:", out_mp4)
 
 # ---------------------------------------------------------------- 5. upload

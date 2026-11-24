@@ -65,7 +65,13 @@ for attempt in range(5):
     run(["git", "checkout", "origin/main", "--", "state/episodes.json"])
     STATE.write_text(json.dumps(new_state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     run(["git", "add", "state/episodes.json"])
-    p = run(["git", "commit", "-m", "chore: advance episode state"], check=False)
+    # The quality history is what makes "every video beats the last one" work,
+    # so it must be committed with the episode state (otherwise each CI run
+    # starts from an empty ladder).
+    qfile = ROOT / "state" / "quality.json"
+    if qfile.exists():
+        run(["git", "add", "state/quality.json"])
+    p = run(["git", "commit", "-m", "chore: advance episode state + quality history"], check=False)
     if p.returncode != 0:
         print("nothing to commit; state already in sync")
         break
