@@ -20,6 +20,26 @@
       "words": 1179,
       "at": "2026-11-24T12:33:32Z",
       "title": "You Live in the Past: The Universe Is Far Away in Time"
+    },
+    {
+      "id": "031",
+      "score": 66,
+      "breakdown": {
+        "hook": 5,
+        "facts": 20,
+        "structure": 15,
+        "length": 0,
+        "repetition": 6,
+        "clarity": 10,
+        "ending": 0,
+        "packaging": 10
+      },
+      "issues": [
+        "Length is 964 words vs target 1200 - off by 20%."
+      ],
+      "words": 964,
+      "at": "2026-11-24T23:44:41Z",
+      "title": "You Have Two Minds: The Split Brain Experiment"
     }
   ],
   "best": 78,
