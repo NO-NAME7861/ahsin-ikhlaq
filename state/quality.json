@@ -40,6 +40,26 @@
       "words": 964,
       "at": "2026-11-24T23:44:41Z",
       "title": "You Have Two Minds: The Split Brain Experiment"
+    },
+    {
+      "id": "002",
+      "score": 76,
+      "breakdown": {
+        "hook": 15,
+        "facts": 20,
+        "structure": 15,
+        "length": 0,
+        "repetition": 6,
+        "clarity": 10,
+        "ending": 0,
+        "packaging": 10
+      },
+      "issues": [
+        "Length is 494 words vs target 1200 - off by 59%."
+      ],
+      "words": 494,
+      "at": "2026-11-25T23:37:45Z",
+      "title": "Betelgeuse Explosion: When Will the Night Sky Change Forever?"
     }
   ],
   "best": 78,
