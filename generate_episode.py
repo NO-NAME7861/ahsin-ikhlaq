@@ -38,6 +38,7 @@ FALLBACK_MODELS    = [m for m in [
 VOICE              = os.environ.get("TTS_VOICE", "en-IN-NeerjaExpressiveNeural")   # Indian expressive female voice (English/Hinglish/Roman Urdu)
 NARRATION_LANG     = os.environ.get("NARRATION_LANG", "hi").strip().lower()
 ENGLISH_MODE       = NARRATION_LANG.startswith("en")
+PURE_URDU_MODE     = NARRATION_LANG == "ur"   # Roman Urdu in Latin script, simple words, no English technical terms
 # +22% is the measured setting that makes this voice speak at ~200 words/minute in English.
 TTS_RATE           = os.environ.get("TTS_RATE", "+22%" if ENGLISH_MODE else "+0%")
 PRIVACY_STATUS     = os.environ.get("PRIVACY_STATUS", "private")  # safe default; set public when confident
@@ -53,7 +54,7 @@ TARGET_MINUTES     = int(os.environ.get("TARGET_MINUTES", "12"))   # minutes; <=
 WORDS_PER_MIN      = 200 if ENGLISH_MODE else 100
 WORDS_TARGET       = int(os.environ.get("WORDS_TARGET", str(TARGET_MINUTES * WORDS_PER_MIN)))
 LONG_MODE          = TARGET_MINUTES >= 15
-MAX_MINUTES        = float(os.environ.get("MAX_MINUTES", "14.2"))  # raise after channel verification
+MAX_MINUTES        = float(os.environ.get("MAX_MINUTES", "21"))  # raise after channel verification (21 = room for 20-min long videos)
 EPISODE_TOPIC      = os.environ.get("EPISODE_TOPIC", "").strip()   # one-off topic override (no csv edit)
 EPISODE_MORAL      = os.environ.get("EPISODE_MORAL", "").strip()
 W, H, FPS = 1920, 1080, 25
@@ -64,17 +65,23 @@ N_IMAGES           = int(_n_img_env) if _n_img_env else (20 if LONG_MODE else 16
 CHANNEL_NAME = "Ahsin Akhlaq"
 
 # Narration language switch: default is the channel's Romanized Hindi-Urdu,
-# "en" produces a fully English episode (same voice, same pipeline).
+# "en" produces a fully English episode (same voice, same pipeline),
+# "ur" produces pure Roman Urdu - simple words only, no English technical terms.
 LANG_STYLE = (
     "clear, vivid, neutral ENGLISH (simple words a 12-year-old understands, short sentences, "
     "no Hindi or Urdu phrases)"
     if ENGLISH_MODE else
+    "pure ROMAN URDU, Latin script only, simple words a 12-year-old understands, short sentences, "
+    "natural spoken Urdu, warm second person address, NO English words or English technical terms"
+    if PURE_URDU_MODE else
     "natural, warm ROMANIZED Hindi-Urdu (Latin script, written exactly the way people text in "
     "India/Pakistan, e.g. 'Namaste doston, aaj sochenge...') with English technical terms "
     "embedded naturally (e.g., 'black hole', 'entropy', 'dark matter')"
 )
 SCRIPT_RULE = ("English only, Latin script." if ENGLISH_MODE
-               else "NEVER Devanagari or Urdu script - Latin letters only")
+               else (f"PURE ROMAN URDU: Latin script, Urdu words only - no English technical terms."
+                     if PURE_URDU_MODE
+                     else "NEVER Devanagari or Urdu script - Latin letters only"))
 
 # ---------------------------------------------------------------- helpers
 

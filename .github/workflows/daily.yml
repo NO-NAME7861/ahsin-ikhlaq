@@ -41,9 +41,9 @@ on:
         default: ""
         type: string
       max_minutes:
-        description: "Safety cap on narration length in minutes (default 14.2; use 55 for long videos)"
+        description: "Safety cap on narration length in minutes (default 21; use 55 for extra-long videos)"
         required: false
-        default: ""
+        default: "21"
         type: string
 
 permissions:
@@ -90,7 +90,7 @@ jobs:
           NARRATION_LANG: ${{ inputs.narration_lang || vars.NARRATION_LANG || 'hi' }}
           EPISODE_TOPIC: ${{ inputs.episode_topic || '' }}
           EPISODE_MORAL: ${{ inputs.episode_moral || '' }}
-          MAX_MINUTES: ${{ inputs.max_minutes || '14.2' }}
+          MAX_MINUTES: ${{ inputs.max_minutes || '21' }}
           N_IMAGES: ${{ vars.N_IMAGES || '' }}
           UPLOAD: "1"
         run: python generate_episode.py
