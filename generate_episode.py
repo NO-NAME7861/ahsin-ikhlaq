@@ -910,6 +910,12 @@ def main():
 
     vid = youtube_upload(ep, out_mp4, thumb)
     add_to_playlist(vid, pillar)
+    # TikTok cross-post is best-effort and non-fatal (needs TikTok dev token).
+    try:
+        import tiktok
+        tiktok.upload(str(out_mp4), ep.get("title", ""), ep.get("description", ""))
+    except Exception as e:
+        log("tiktok cross-post skipped (non-fatal):", e)
     try:
         drive_backup(out_mp4)
     except Exception as e:
