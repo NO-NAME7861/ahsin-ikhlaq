@@ -2,10 +2,9 @@ name: Daily Universe Explorer Upload
 
 on:
   schedule:
-    # 2 long episodes per day (quota-safe: 2 long + 3 shorts = 5 uploads/day,
-    # ~8,600 of YouTube's 10,000 daily API units).
-    # 8:00 / 8:30 PM PKT = 15:00 / 15:30 UTC
-    - cron: "0,30 15 * * *"
+    # 5 long episodes per day (uploaded daily) - minimum 20 minutes target each
+    # 12:00-16:00 UTC slots (PKT: 3 PM - 7 PM)
+    - cron: "0 12,13,14,15,16 * * *"
   workflow_dispatch:
     inputs:
       privacy:

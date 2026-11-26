@@ -2,10 +2,10 @@ name: Daily Universe Shorts
 
 on:
   schedule:
-    # 3 shorts per day: 1:05 PM / 4:05 PM / 6:05 PM PKT = 08:05 / 11:05 / 13:05 UTC
-    # (YouTube's upload cap resets at midnight Pacific = 1 PM PKT, so a 9 AM slot
-    #  always ran into uploadLimitExceeded and was wasted.)
-    - cron: "5 8,11,13 * * *"
+    # 5 shorts per day: 07:05 / 09:05 / 11:05 / 13:05 / 15:05 UTC
+    # (YouTube's upload cap resets at midnight Pacific = 1 PM PKT, so shorts
+    # slots must stay before 1 PM PKT to avoid uploadLimitExceeded)
+    - cron: "5 7,9,11,13,15 * * *"
   workflow_dispatch:
     inputs:
       privacy:
