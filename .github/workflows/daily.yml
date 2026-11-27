@@ -77,6 +77,20 @@ jobs:
           echo "${{ secrets.YOUTUBE_TOKEN_JSON }}" | base64 -d > token.json
           test -s token.json && echo "token.json OK"
 
+      - name: Pick trending topic (AI trend selector)
+        id: trend
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
+          NICHET: "Cosmic universe / mind / brain exploration"
+        run: |
+          TOPIC_DATA=$(python pick_topic.py)
+          TOPIC=$(echo "$TOPIC_DATA" | python -c "import sys, json; d=json.load(sys.stdin); print((d.get('topic') or '').strip())")
+          MORAL=$(echo "$TOPIC_DATA" | python -c "import sys, json; d=json.load(sys.stdin); print((d.get('moral') or '').strip())")
+          echo "topic=$TOPIC" >> "$GITHUB_OUTPUT"
+          echo "moral=$MORAL" >> "$GITHUB_OUTPUT"
+          echo "Trending topic picked: $TOPIC"
+
       - name: Generate episode and upload
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -87,8 +101,8 @@ jobs:
           EPISODE_INDEX: ${{ inputs.episode_index || '' }}
           TARGET_MINUTES: ${{ inputs.target_minutes || vars.TARGET_MINUTES || '12' }}
           NARRATION_LANG: ${{ inputs.narration_lang || vars.NARRATION_LANG || 'hi' }}
-          EPISODE_TOPIC: ${{ inputs.episode_topic || '' }}
-          EPISODE_MORAL: ${{ inputs.episode_moral || '' }}
+          EPISODE_TOPIC: ${{ steps.trend.outputs.topic || inputs.episode_topic || '' }}
+          EPISODE_MORAL: ${{ steps.trend.outputs.moral || inputs.episode_moral || '' }}
           MAX_MINUTES: ${{ inputs.max_minutes || '21' }}
           N_IMAGES: ${{ vars.N_IMAGES || '' }}
           UPLOAD: "1"

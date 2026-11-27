@@ -115,6 +115,12 @@ def scrub_ai_text(text):
     return out or text
 
 def load_episode():
+    if EPISODE_OVERRIDE:
+        rows = list(csv.DictReader(open(EPISODES_CSV, encoding="utf-8")))
+        row = next((r for r in rows if r["id"] == EPISODE_OVERRIDE), None)
+        if not row:
+            sys.exit(f"EPISODE_INDEX {EPISODE_OVERRIDE} not found in episodes.csv")
+        return row
     if EPISODE_TOPIC:
         return {
             "id": EPISODE_OVERRIDE or "special",
@@ -123,11 +129,6 @@ def load_episode():
         }
     rows = list(csv.DictReader(open(EPISODES_CSV, encoding="utf-8")))
     assert rows, "episodes.csv empty"
-    if EPISODE_OVERRIDE:
-        row = next((r for r in rows if r["id"] == EPISODE_OVERRIDE), None)
-        if not row:
-            sys.exit(f"EPISODE_INDEX {EPISODE_OVERRIDE} not found in episodes.csv")
-        return row
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {"next_id": rows[0]["id"], "done": []}
     row = next((r for r in rows if r["id"] == state.get("next_id")), rows[0])
     return row
