@@ -1,0 +1,75 @@
+name: Auto Self-Dev
+
+# Self-development mode: AI-driven episode generation pass (no upload, commits state)
+on:
+  schedule:
+    - cron: "0 9 * * 0"  # weekly Sunday 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: self-dev
+  cancel-in-progress: false
+
+jobs:
+  selfdev:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-core fonts-noto-ui-core
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Decode YouTube token
+        run: |
+          echo "${{ secrets.YOUTUBE_TOKEN_JSON }}" | base64 -d > token.json
+          test -s token.json && echo "token.json OK"
+
+      - name: Generate next episode (self-dev AI content pass, NO upload)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
+          TTS_VOICE: ${{ vars.TTS_VOICE || 'en-IN-NeerjaExpressiveNeural' }}
+          PRIVACY_STATUS: ${{ vars.PRIVACY_STATUS || 'public' }}
+          EPISODES_CSV: ${{ vars.EPISODES_CSV || 'episodes.csv' }}
+          EPISODE_INDEX: ${{ github.event.inputs.episode_index || '' }}
+          TARGET_MINUTES: ${{ github.event.inputs.target_minutes || vars.TARGET_MINUTES || '12' }}
+          NARRATION_LANG: ${{ github.event.inputs.narration_lang || vars.NARRATION_LANG || 'hi' }}
+          EPISODE_TOPIC: ${{ github.event.inputs.episode_topic || '' }}
+          EPISODE_MORAL: ${{ github.event.inputs.episode_moral || '' }}
+          MAX_MINUTES: ${{ github.event.inputs.max_minutes || '21' }}
+          N_IMAGES: ${{ vars.N_IMAGES || '' }}
+          UPLOAD: "0"
+        run: python generate_episode.py
+
+      - name: Save progress state
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/episodes.json
+          git diff --cached --quiet || (git commit -m "chore: self-dev episode state" && git pull --rebase origin main && git push origin HEAD:main)
+
+      - name: Upload work artifacts for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selfdev-work
+          path: |
+            work/*.json
+            work/*.txt
+            work/*.srt
+          retention-days: 14
