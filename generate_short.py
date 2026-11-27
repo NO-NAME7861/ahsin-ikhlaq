@@ -317,8 +317,8 @@ def build_video(image_paths, audio, srt, out_mp4):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    sub_style = ("FontName=Noto Sans,FontSize=48,Bold=-1,PrimaryColour=&H00FFFFFF,"
-                 "OutlineColour=&H00000000,BorderStyle=4,Outline=3,Shadow=0,MarginV=80")
+    sub_style = ("FontName=Noto Sans,FontSize=12,Bold=-1,PrimaryColour=&H00FFFFFF,"
+                 "OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV=80")
     subprocess.run(["ffmpeg", "-y", "-i", str(concat), "-i", str(audio),
                     "-vf", f"subtitles={srt.as_posix()}:force_style='{sub_style}'",
                     "-c:v", "libx264", "-preset", "fast", "-crf", "20",
@@ -540,8 +540,8 @@ Angle: {angle}"""
         hook = (ep.get("thumbnail_hook") or "").strip() or ep["title"].split(":")[0][:32].upper()
         pillar = pillar_for(topic + " " + ep["title"])
         thumb = WORK / f"thumb_{ep_id}.jpg"
-        # Shorts: cap the hook font so the text stays decent, not oversized.
-        make_thumbnail(band, hook, pillar, thumb, max_font=96)
+        # Shorts: cap the hook font so the text stays small and decent.
+        make_thumbnail(band, hook, pillar, thumb, max_font=30)
         log(f"thumbnail built (hook='{hook}', pillar={pillar})")
     except Exception as e:
         log("thumbnail build failed (non-fatal):", e)

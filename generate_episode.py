@@ -578,7 +578,7 @@ def build_video(image_paths, audio, srt, out_mp4, thumb):
                     "-c", "copy", str(concat)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    font_size = max(20, int(30 * H / 1080))
+    font_size = 12
     margin_v = max(24, int(40 * H / 1080))
     sub_style = (f"FontName=Noto Sans,FontSize={font_size},Bold=-1,PrimaryColour=&H00FFFFFF,"
                  f"OutlineColour=&H00000000,BorderStyle=4,Outline=2,Shadow=0,MarginV={margin_v}")
