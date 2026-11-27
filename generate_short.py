@@ -540,7 +540,8 @@ Angle: {angle}"""
         hook = (ep.get("thumbnail_hook") or "").strip() or ep["title"].split(":")[0][:32].upper()
         pillar = pillar_for(topic + " " + ep["title"])
         thumb = WORK / f"thumb_{ep_id}.jpg"
-        make_thumbnail(band, hook, pillar, thumb)
+        # Shorts: cap the hook font so the text stays decent, not oversized.
+        make_thumbnail(band, hook, pillar, thumb, max_font=96)
         log(f"thumbnail built (hook='{hook}', pillar={pillar})")
     except Exception as e:
         log("thumbnail build failed (non-fatal):", e)

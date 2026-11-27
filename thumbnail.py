@@ -138,10 +138,10 @@ def _wrap(draw, text: str, font, max_width: int):
     return lines, widest
 
 
-def _fit_hook(draw, hook: str, max_width: int, max_height: int):
+def _fit_hook(draw, hook: str, max_width: int, max_height: int, max_font: int = 150):
     """Find the largest font size that fits the whole hook in the box."""
     hook = hook.upper().strip()
-    for size in range(150, 45, -4):
+    for size in range(max_font, 45, -4):
         font = _font(size)
         lines, widest = _wrap(draw, hook, font, max_width)
         line_h = int(size * 1.08)
@@ -159,11 +159,13 @@ def _rounded(draw, box, radius, fill):
 
 def make_thumbnail(base_image, hook: str, pillar: str, out_path,
                    channel: str = "AHSIN AKHLAQ",
-                   trim_bottom: float = 0.08, trim_right: float = 0.05) -> Path:
+                   trim_bottom: float = 0.08, trim_right: float = 0.05,
+                   max_font: int = 150) -> Path:
     """Render a branded 1280x720 thumbnail. Returns the output path.
 
     trim_bottom/trim_right: fractions cut from the source before cover-cropping.
     Video-frame fallbacks carry burned-in subtitles, so they need a bigger cut.
+    max_font: cap the hook size (Shorts use a smaller cap so text isn't huge).
     """
     pillar = pillar if pillar in PILLARS else pillar_for(hook)
     accent = PILLARS[pillar]["accent"]
@@ -201,7 +203,7 @@ def make_thumbnail(base_image, hook: str, pillar: str, out_path,
     # --- hook text -------------------------------------------------------
     box_x, box_y = 56, 92
     max_w, max_h = 700, 430
-    font, lines, line_h, size = _fit_hook(draw, hook, max_w, max_h)
+    font, lines, line_h, size = _fit_hook(draw, hook, max_w, max_h, max_font=max_font)
 
     stroke = max(6, size // 11)
     y = box_y
