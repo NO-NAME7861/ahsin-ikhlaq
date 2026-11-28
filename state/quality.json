@@ -78,6 +78,27 @@
       "words": 1065,
       "at": "2026-11-27T05:56:14Z",
       "title": "Why You Think Everyone Is Watching You: The Spotlight Effect Explained"
+    },
+    {
+      "id": "005",
+      "score": 72,
+      "breakdown": {
+        "hook": 12,
+        "facts": 20,
+        "structure": 9,
+        "length": 0,
+        "repetition": 6,
+        "clarity": 10,
+        "ending": 5,
+        "packaging": 10
+      },
+      "issues": [
+        "26 scenes - aim for 6-12 paragraphs.",
+        "Length is 1277 words vs target 2000 - off by 36%."
+      ],
+      "words": 1277,
+      "at": "2026-11-28T11:01:20Z",
+      "title": "The Universe Has Two Ages: Why Measurements Disagree"
     }
   ],
   "best": 78,
